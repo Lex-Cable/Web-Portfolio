@@ -1,0 +1,427 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global safety net: deny everything by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Core primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrappedAdminEmail() {
+      return isVerifiedUser() && request.auth.token.email == 'jaccie.wambui26@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdminEmail() ||
+        (isVerifiedUser() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+    }
+
+    function isValidString(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    function isValidOptionalString(data, key, maxLen) {
+      return !(key in data) || (data[key] is string && data[key].size() <= maxLen);
+    }
+
+    function isValidUrlString(val, maxLen) {
+      return val is string && val.size() <= maxLen && (val == '' || val.matches('^https?://.*') || val.matches('^/src/assets/.*') || val.matches('^/api/.*'));
+    }
+
+    function isValidStringList(listVal, maxItems) {
+      return listVal is list && listVal.size() <= maxItems && (listVal.size() == 0 || (listVal[0] is string && listVal[0].size() <= 200));
+    }
+
+    // Validation Helpers (Anti-Update-Gap Blueprints)
+    function isValidAdminUser(data) {
+      return data.keys().hasAll(['email', 'role', 'createdAt']) &&
+        data.keys().hasOnly(['email', 'role', 'createdAt']) &&
+        isValidString(data.email, 3, 160) &&
+        data.role == 'admin' &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidPortfolioProfile(data) {
+      return data.keys().hasAll(['name', 'title', 'location', 'githubUsername', 'email', 'headline', 'shortBio', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'name', 'title', 'location', 'githubUsername', 'githubUrl', 'email',
+          'linkedinUrl', 'devtoUrl', 'mastodonHandle', 'blueskyHandle',
+          'headline', 'shortBio', 'fullBio', 'approach', 'careerGoals',
+          'photoUrl', 'seoTitle', 'seoDescription', 'updatedAt'
+        ]) &&
+        isValidString(data.name, 1, 120) &&
+        isValidString(data.title, 1, 120) &&
+        isValidString(data.location, 1, 120) &&
+        isValidString(data.githubUsername, 1, 60) &&
+        isValidString(data.email, 3, 160) &&
+        isValidString(data.headline, 1, 240) &&
+        isValidString(data.shortBio, 1, 800) &&
+        isValidOptionalString(data, 'githubUrl', 300) &&
+        isValidOptionalString(data, 'linkedinUrl', 300) &&
+        isValidOptionalString(data, 'devtoUrl', 300) &&
+        isValidOptionalString(data, 'mastodonHandle', 120) &&
+        isValidOptionalString(data, 'blueskyHandle', 120) &&
+        isValidOptionalString(data, 'fullBio', 4000) &&
+        isValidOptionalString(data, 'approach', 2500) &&
+        isValidOptionalString(data, 'careerGoals', 2000) &&
+        (!('photoUrl' in data) || isValidUrlString(data.photoUrl, 500)) &&
+        isValidOptionalString(data, 'seoTitle', 120) &&
+        isValidOptionalString(data, 'seoDescription', 300) &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidGithubCache(data) {
+      return data.keys().hasAll(['username', 'profileUrl', 'publicReposCount', 'totalStars', 'totalForks', 'lastSyncedAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'username', 'name', 'avatarUrl', 'bio', 'profileUrl',
+          'publicReposCount', 'totalStars', 'totalForks', 'contributionsSummary',
+          'topLanguagesJson', 'repositoriesJson', 'recentEventsJson',
+          'statsSourceNote', 'lastSyncedAt', 'updatedAt'
+        ]) &&
+        isValidString(data.username, 1, 60) &&
+        isValidUrlString(data.profileUrl, 300) &&
+        data.publicReposCount is int && data.publicReposCount >= 0 &&
+        data.totalStars is int && data.totalStars >= 0 &&
+        data.totalForks is int && data.totalForks >= 0 &&
+        isValidString(data.lastSyncedAt, 1, 80) &&
+        isValidOptionalString(data, 'name', 120) &&
+        (!('avatarUrl' in data) || isValidUrlString(data.avatarUrl, 500)) &&
+        isValidOptionalString(data, 'bio', 500) &&
+        isValidOptionalString(data, 'contributionsSummary', 1000) &&
+        isValidOptionalString(data, 'topLanguagesJson', 8000) &&
+        isValidOptionalString(data, 'repositoriesJson', 60000) &&
+        isValidOptionalString(data, 'recentEventsJson', 40000) &&
+        isValidOptionalString(data, 'statsSourceNote', 400) &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidApprovedCv(data) {
+      return data.keys().hasAll(['versionId', 'fileName', 'mimeType', 'fileSize', 'dataBase64', 'updatedAt']) &&
+        data.keys().hasOnly(['versionId', 'fileName', 'mimeType', 'fileSize', 'dataBase64', 'summaryNote', 'updatedAt']) &&
+        isValidString(data.versionId, 1, 128) &&
+        isValidString(data.fileName, 1, 200) &&
+        isValidString(data.mimeType, 1, 100) &&
+        data.fileSize is int && data.fileSize >= 0 && data.fileSize <= 750000 &&
+        isValidString(data.dataBase64, 1, 850000) &&
+        isValidOptionalString(data, 'summaryNote', 500) &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidProject(data) {
+      return data.keys().hasAll([
+          'slug', 'title', 'shortDescription', 'problemStatement', 'contributionRole',
+          'fullDescription', 'technologies', 'features', 'githubUrl', 'status',
+          'featured', 'isPublic', 'displayOrder', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'slug', 'title', 'shortDescription', 'problemStatement', 'contributionRole',
+          'fullDescription', 'technologies', 'features', 'verificationNote', 'imageUrl',
+          'githubUrl', 'liveDemoUrl', 'status', 'featured', 'isPublic',
+          'sourceRepoName', 'repoUpdatedAt', 'displayOrder', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidString(data.slug, 1, 120) && data.slug.matches('^[a-z0-9-]+$') &&
+        isValidString(data.title, 1, 160) &&
+        isValidString(data.shortDescription, 1, 500) &&
+        isValidString(data.problemStatement, 1, 2000) &&
+        isValidString(data.contributionRole, 1, 2000) &&
+        isValidString(data.fullDescription, 1, 6000) &&
+        isValidStringList(data.technologies, 25) &&
+        isValidStringList(data.features, 25) &&
+        isValidOptionalString(data, 'verificationNote', 600) &&
+        (!('imageUrl' in data) || isValidUrlString(data.imageUrl, 500)) &&
+        isValidUrlString(data.githubUrl, 300) &&
+        (!('liveDemoUrl' in data) || isValidUrlString(data.liveDemoUrl, 300)) &&
+        data.status in ['In Development', 'Active Prototype', 'Completed', 'Archived'] &&
+        data.featured is bool &&
+        data.isPublic is bool &&
+        isValidOptionalString(data, 'sourceRepoName', 140) &&
+        isValidOptionalString(data, 'repoUpdatedAt', 80) &&
+        data.displayOrder is int &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidSkill(data) {
+      return data.keys().hasAll(['name', 'category', 'proficiency', 'isPublic', 'displayOrder', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['name', 'category', 'proficiency', 'note', 'isPublic', 'displayOrder', 'createdAt', 'updatedAt']) &&
+        isValidString(data.name, 1, 80) &&
+        data.category in [
+          'Frontend Development', 'Backend Development', 'Databases',
+          'Development Tools and DevOps', 'Other Technologies', 'Additional Learning Interests'
+        ] &&
+        data.proficiency in ['Proficient', 'Comfortable', 'Familiar', 'Currently Learning'] &&
+        isValidOptionalString(data, 'note', 240) &&
+        data.isPublic is bool &&
+        data.displayOrder is int &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidExperience(data) {
+      return data.keys().hasAll(['organization', 'role', 'period', 'entryType', 'summary', 'highlights', 'ambiguityFlag', 'isPublic', 'displayOrder', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['organization', 'location', 'role', 'period', 'entryType', 'summary', 'highlights', 'ambiguityFlag', 'ambiguityNote', 'isPublic', 'displayOrder', 'createdAt', 'updatedAt']) &&
+        isValidString(data.organization, 1, 160) &&
+        isValidOptionalString(data, 'location', 120) &&
+        isValidString(data.role, 1, 160) &&
+        isValidString(data.period, 1, 100) &&
+        data.entryType in ['Work Experience', 'Internship', 'Draft Record'] &&
+        isValidString(data.summary, 1, 1500) &&
+        isValidStringList(data.highlights, 20) &&
+        data.ambiguityFlag is bool &&
+        isValidOptionalString(data, 'ambiguityNote', 600) &&
+        data.isPublic is bool &&
+        data.displayOrder is int &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidEducation(data) {
+      return data.keys().hasAll(['institution', 'qualification', 'expectedGraduation', 'statusLabel', 'location', 'coursework', 'isPublic', 'displayOrder', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['institution', 'qualification', 'expectedGraduation', 'statusLabel', 'location', 'coursework', 'notes', 'isPublic', 'displayOrder', 'createdAt', 'updatedAt']) &&
+        isValidString(data.institution, 1, 160) &&
+        isValidString(data.qualification, 1, 160) &&
+        isValidString(data.expectedGraduation, 1, 60) &&
+        isValidString(data.statusLabel, 1, 80) &&
+        isValidString(data.location, 1, 160) &&
+        isValidStringList(data.coursework, 25) &&
+        isValidOptionalString(data, 'notes', 800) &&
+        data.isPublic is bool &&
+        data.displayOrder is int &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidPendingApproval(data) {
+      return data.keys().hasAll(['category', 'targetType', 'targetId', 'title', 'explanation', 'previousContentJson', 'proposedContentJson', 'source', 'status', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['category', 'targetType', 'targetId', 'title', 'explanation', 'previousContentJson', 'proposedContentJson', 'source', 'status', 'reviewerNote', 'createdAt', 'updatedAt']) &&
+        data.category in ['new_repo', 'repo_update', 'bio_update', 'skill_update', 'experience_update', 'cv_update', 'seo_update', 'ai_suggestion'] &&
+        data.targetType in ['project', 'profile', 'skill', 'experience', 'cv', 'seo'] &&
+        isValidString(data.targetId, 1, 128) &&
+        isValidString(data.title, 1, 200) &&
+        isValidString(data.explanation, 1, 1500) &&
+        isValidString(data.previousContentJson, 0, 30000) &&
+        isValidString(data.proposedContentJson, 1, 30000) &&
+        data.source in ['github_sync', 'gemini_ai', 'manual_draft'] &&
+        data.status in ['pending', 'approved', 'rejected', 'edited_approved'] &&
+        isValidOptionalString(data, 'reviewerNote', 600) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidAuditLog(data) {
+      return data.keys().hasAll(['action', 'entityType', 'entityId', 'summary', 'actorEmail', 'createdAt']) &&
+        data.keys().hasOnly(['action', 'entityType', 'entityId', 'summary', 'actorEmail', 'detailsJson', 'createdAt']) &&
+        isValidString(data.action, 1, 80) &&
+        isValidString(data.entityType, 1, 80) &&
+        isValidString(data.entityId, 1, 128) &&
+        isValidString(data.summary, 1, 500) &&
+        isValidString(data.actorEmail, 3, 160) &&
+        isValidOptionalString(data, 'detailsJson', 8000) &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidCvVersion(data) {
+      return data.keys().hasAll(['versionLabel', 'fileName', 'mimeType', 'fileSize', 'dataBase64', 'isPublicApproved', 'uploadedByEmail', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['versionLabel', 'fileName', 'mimeType', 'fileSize', 'dataBase64', 'notes', 'isPublicApproved', 'uploadedByEmail', 'createdAt', 'updatedAt']) &&
+        isValidString(data.versionLabel, 1, 80) &&
+        isValidString(data.fileName, 1, 200) &&
+        isValidString(data.mimeType, 1, 100) &&
+        data.fileSize is int && data.fileSize >= 0 && data.fileSize <= 750000 &&
+        isValidString(data.dataBase64, 1, 850000) &&
+        isValidOptionalString(data, 'notes', 500) &&
+        data.isPublicApproved is bool &&
+        isValidString(data.uploadedByEmail, 3, 160) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidGithubSettings(data) {
+      return data.keys().hasAll(['syncFrequencyMinutes', 'autoMetadataRefresh', 'detectNewRepos', 'detectReadmeChanges', 'generateAiSuggestions', 'emailNotifications', 'requireApprovalBeforePublish', 'updatedAt']) &&
+        data.keys().hasOnly(['syncFrequencyMinutes', 'autoMetadataRefresh', 'detectNewRepos', 'detectReadmeChanges', 'generateAiSuggestions', 'emailNotifications', 'requireApprovalBeforePublish', 'lastSyncAt', 'lastSyncStatus', 'lastSyncSummary', 'updatedAt']) &&
+        data.syncFrequencyMinutes is int && data.syncFrequencyMinutes >= 5 && data.syncFrequencyMinutes <= 10080 &&
+        data.autoMetadataRefresh is bool &&
+        data.detectNewRepos is bool &&
+        data.detectReadmeChanges is bool &&
+        data.generateAiSuggestions is bool &&
+        data.emailNotifications is bool &&
+        data.requireApprovalBeforePublish is bool &&
+        isValidOptionalString(data, 'lastSyncAt', 80) &&
+        isValidOptionalString(data, 'lastSyncStatus', 80) &&
+        isValidOptionalString(data, 'lastSyncSummary', 500) &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidContactMessage(data) {
+      return data.keys().hasAll(['senderName', 'senderEmail', 'subject', 'message', 'emailDelivered', 'status', 'createdAt']) &&
+        data.keys().hasOnly(['senderName', 'senderEmail', 'subject', 'message', 'emailDelivered', 'status', 'createdAt']) &&
+        isValidString(data.senderName, 2, 120) &&
+        isValidString(data.senderEmail, 5, 160) &&
+        isValidString(data.subject, 2, 200) &&
+        isValidString(data.message, 5, 4000) &&
+        data.emailDelivered is bool &&
+        data.status in ['unread', 'read', 'replied', 'archived'] &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidAnalyticsEvent(data) {
+      return data.keys().hasAll(['eventType', 'targetSlug', 'referrer', 'createdAt']) &&
+        data.keys().hasOnly(['eventType', 'targetSlug', 'referrer', 'createdAt']) &&
+        data.eventType in ['page_view', 'project_view', 'cv_download', 'contact_submit'] &&
+        isValidString(data.targetSlug, 1, 140) &&
+        isValidString(data.referrer, 0, 300) &&
+        data.createdAt is timestamp;
+    }
+
+    // Connection ping path
+    match /test/{docId} {
+      allow get: if docId == 'connection';
+    }
+
+    // Admin registry (PII-isolated, admin only)
+    match /admins/{uid} {
+      allow get: if isAdmin() && isValidId(uid);
+      allow list: if isAdmin();
+      allow create: if isBootstrappedAdminEmail() && isValidId(uid) && isValidAdminUser(incoming()) && incoming().createdAt == request.time;
+      allow update: if isBootstrappedAdminEmail() && isValidId(uid) && isValidAdminUser(incoming()) && incoming().createdAt == existing().createdAt;
+      allow delete: if isBootstrappedAdminEmail() && isValidId(uid);
+    }
+
+    // Public portfolio singletons
+    match /portfolio_public/profile {
+      allow get: if true;
+      allow create: if isAdmin() && isValidPortfolioProfile(incoming()) && incoming().updatedAt == request.time;
+      allow update: if isAdmin() && isValidPortfolioProfile(incoming()) && incoming().updatedAt == request.time;
+      allow delete: if false;
+    }
+
+    match /portfolio_public/github_cache {
+      allow get: if true;
+      allow create: if isAdmin() && isValidGithubCache(incoming()) && incoming().updatedAt == request.time;
+      allow update: if isAdmin() && isValidGithubCache(incoming()) && incoming().updatedAt == request.time;
+      allow delete: if false;
+    }
+
+    match /portfolio_public/approved_cv {
+      allow get: if true;
+      allow create: if isAdmin() && isValidApprovedCv(incoming()) && incoming().updatedAt == request.time;
+      allow update: if isAdmin() && isValidApprovedCv(incoming()) && incoming().updatedAt == request.time;
+      allow delete: if isAdmin();
+    }
+
+    // Projects
+    match /projects/{projectId} {
+      allow get: if isValidId(projectId) && (resource == null || existing().isPublic == true || isAdmin());
+      allow list: if existing().isPublic == true || isAdmin();
+      allow create: if isAdmin() && isValidId(projectId) && isValidProject(incoming()) && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isAdmin() && isValidId(projectId) && isValidProject(incoming()) && incoming().createdAt == existing().createdAt && incoming().updatedAt == request.time;
+      allow delete: if isAdmin() && isValidId(projectId);
+    }
+
+    // Skills
+    match /skills/{skillId} {
+      allow get: if isValidId(skillId) && (resource == null || existing().isPublic == true || isAdmin());
+      allow list: if existing().isPublic == true || isAdmin();
+      allow create: if isAdmin() && isValidId(skillId) && isValidSkill(incoming()) && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isAdmin() && isValidId(skillId) && isValidSkill(incoming()) && incoming().createdAt == existing().createdAt && incoming().updatedAt == request.time;
+      allow delete: if isAdmin() && isValidId(skillId);
+    }
+
+    // Experiences
+    match /experiences/{expId} {
+      allow get: if isValidId(expId) && (resource == null || existing().isPublic == true || isAdmin());
+      allow list: if existing().isPublic == true || isAdmin();
+      allow create: if isAdmin() && isValidId(expId) && isValidExperience(incoming()) && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isAdmin() && isValidId(expId) && isValidExperience(incoming()) && incoming().createdAt == existing().createdAt && incoming().updatedAt == request.time;
+      allow delete: if isAdmin() && isValidId(expId);
+    }
+
+    // Education
+    match /education/{eduId} {
+      allow get: if isValidId(eduId) && (resource == null || existing().isPublic == true || isAdmin());
+      allow list: if existing().isPublic == true || isAdmin();
+      allow create: if isAdmin() && isValidId(eduId) && isValidEducation(incoming()) && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isAdmin() && isValidId(eduId) && isValidEducation(incoming()) && incoming().createdAt == existing().createdAt && incoming().updatedAt == request.time;
+      allow delete: if isAdmin() && isValidId(eduId);
+    }
+
+    // Admin-only Pending Approvals
+    match /pending_approvals/{approvalId} {
+      allow get: if isAdmin() && isValidId(approvalId);
+      allow list: if isAdmin();
+      allow create: if isAdmin() && isValidId(approvalId) && isValidPendingApproval(incoming()) && incoming().status == 'pending' && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isAdmin() && isValidId(approvalId) && isValidPendingApproval(incoming()) &&
+        (existing().status == 'pending' || isBootstrappedAdminEmail()) &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'proposedContentJson', 'reviewerNote', 'title', 'explanation', 'updatedAt']);
+      allow delete: if isAdmin() && isValidId(approvalId);
+    }
+
+    // Admin-only Immutable Audit Logs
+    match /audit_logs/{logId} {
+      allow get: if isAdmin() && isValidId(logId);
+      allow list: if isAdmin();
+      allow create: if isAdmin() && isValidId(logId) && isValidAuditLog(incoming()) && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // Admin-only Private CV Versions
+    match /cv_versions/{versionId} {
+      allow get: if isAdmin() && isValidId(versionId);
+      allow list: if isAdmin();
+      allow create: if isAdmin() && isValidId(versionId) && isValidCvVersion(incoming()) && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isAdmin() && isValidId(versionId) && isValidCvVersion(incoming()) && incoming().createdAt == existing().createdAt && incoming().updatedAt == request.time;
+      allow delete: if isAdmin() && isValidId(versionId);
+    }
+
+    // Admin-only GitHub Automation Settings
+    match /github_settings/{configId} {
+      allow get: if isAdmin() && isValidId(configId);
+      allow list: if isAdmin();
+      allow create: if isAdmin() && isValidId(configId) && isValidGithubSettings(incoming()) && incoming().updatedAt == request.time;
+      allow update: if isAdmin() && isValidId(configId) && isValidGithubSettings(incoming()) && incoming().updatedAt == request.time;
+      allow delete: if isAdmin() && isValidId(configId);
+    }
+
+    // Contact Messages (public create, admin read/triage)
+    match /contact_messages/{messageId} {
+      allow get: if isAdmin() && isValidId(messageId);
+      allow list: if isAdmin();
+      allow create: if isValidId(messageId) && isValidContactMessage(incoming()) && incoming().status == 'unread' && incoming().createdAt == request.time;
+      allow update: if isAdmin() && isValidId(messageId) && isValidContactMessage(incoming()) &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status']);
+      allow delete: if isAdmin() && isValidId(messageId);
+    }
+
+    // Analytics Events (public create, admin read)
+    match /analytics_events/{eventId} {
+      allow get: if isAdmin() && isValidId(eventId);
+      allow list: if isAdmin();
+      allow create: if isValidId(eventId) && isValidAnalyticsEvent(incoming()) && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isAdmin() && isValidId(eventId);
+    }
+  }
+}

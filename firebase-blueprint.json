@@ -1,0 +1,325 @@
+{
+  "entities": {
+    "PortfolioProfile": {
+      "title": "PortfolioProfile",
+      "description": "Publicly visible professional identity, biography, and contact links for Jacinta Wambui Waweru.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 120 },
+        "title": { "type": "string", "maxLength": 120 },
+        "location": { "type": "string", "maxLength": 120 },
+        "githubUsername": { "type": "string", "maxLength": 60 },
+        "githubUrl": { "type": "string", "maxLength": 300 },
+        "email": { "type": "string", "maxLength": 160 },
+        "linkedinUrl": { "type": "string", "maxLength": 300 },
+        "devtoUrl": { "type": "string", "maxLength": 300 },
+        "mastodonHandle": { "type": "string", "maxLength": 120 },
+        "blueskyHandle": { "type": "string", "maxLength": 120 },
+        "headline": { "type": "string", "maxLength": 240 },
+        "shortBio": { "type": "string", "maxLength": 800 },
+        "fullBio": { "type": "string", "maxLength": 4000 },
+        "approach": { "type": "string", "maxLength": 2500 },
+        "careerGoals": { "type": "string", "maxLength": 2000 },
+        "photoUrl": { "type": "string", "maxLength": 500 },
+        "seoTitle": { "type": "string", "maxLength": 120 },
+        "seoDescription": { "type": "string", "maxLength": 300 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "title", "location", "githubUsername", "email", "headline", "shortBio", "updatedAt"]
+    },
+    "GithubCache": {
+      "title": "GithubCache",
+      "description": "Public GitHub synchronization snapshot for Lex-Cable.",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string", "maxLength": 60 },
+        "name": { "type": "string", "maxLength": 120 },
+        "avatarUrl": { "type": "string", "maxLength": 500 },
+        "bio": { "type": "string", "maxLength": 500 },
+        "profileUrl": { "type": "string", "maxLength": 300 },
+        "publicReposCount": { "type": "integer" },
+        "totalStars": { "type": "integer" },
+        "totalForks": { "type": "integer" },
+        "contributionsSummary": { "type": "string", "maxLength": 1000 },
+        "topLanguagesJson": { "type": "string", "maxLength": 8000 },
+        "repositoriesJson": { "type": "string", "maxLength": 60000 },
+        "recentEventsJson": { "type": "string", "maxLength": 40000 },
+        "statsSourceNote": { "type": "string", "maxLength": 400 },
+        "lastSyncedAt": { "type": "string", "maxLength": 80 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["username", "profileUrl", "publicReposCount", "totalStars", "totalForks", "lastSyncedAt", "updatedAt"]
+    },
+    "ApprovedCv": {
+      "title": "ApprovedCv",
+      "description": "Single latest approved public CV record available for visitor download.",
+      "type": "object",
+      "properties": {
+        "versionId": { "type": "string", "maxLength": 128 },
+        "fileName": { "type": "string", "maxLength": 200 },
+        "mimeType": { "type": "string", "maxLength": 100 },
+        "fileSize": { "type": "integer" },
+        "dataBase64": { "type": "string", "maxLength": 850000 },
+        "summaryNote": { "type": "string", "maxLength": 500 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["versionId", "fileName", "mimeType", "fileSize", "dataBase64", "updatedAt"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Portfolio software project with verified technologies, problem statement, and repository links.",
+      "type": "object",
+      "properties": {
+        "slug": { "type": "string", "maxLength": 120, "pattern": "^[a-z0-9-]+$" },
+        "title": { "type": "string", "maxLength": 160 },
+        "shortDescription": { "type": "string", "maxLength": 500 },
+        "problemStatement": { "type": "string", "maxLength": 2000 },
+        "contributionRole": { "type": "string", "maxLength": 2000 },
+        "fullDescription": { "type": "string", "maxLength": 6000 },
+        "technologies": { "type": "array" },
+        "features": { "type": "array" },
+        "verificationNote": { "type": "string", "maxLength": 600 },
+        "imageUrl": { "type": "string", "maxLength": 500 },
+        "githubUrl": { "type": "string", "maxLength": 300 },
+        "liveDemoUrl": { "type": "string", "maxLength": 300 },
+        "status": { "type": "string", "enum": ["In Development", "Active Prototype", "Completed", "Archived"] },
+        "featured": { "type": "boolean" },
+        "isPublic": { "type": "boolean" },
+        "sourceRepoName": { "type": "string", "maxLength": 140 },
+        "repoUpdatedAt": { "type": "string", "maxLength": 80 },
+        "displayOrder": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["slug", "title", "shortDescription", "problemStatement", "contributionRole", "fullDescription", "technologies", "features", "githubUrl", "status", "featured", "isPublic", "displayOrder", "createdAt", "updatedAt"]
+    },
+    "Skill": {
+      "title": "Skill",
+      "description": "Categorized technical skill with editable proficiency level.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 80 },
+        "category": { "type": "string", "enum": ["Frontend Development", "Backend Development", "Databases", "Development Tools and DevOps", "Other Technologies", "Additional Learning Interests"] },
+        "proficiency": { "type": "string", "enum": ["Proficient", "Comfortable", "Familiar", "Currently Learning"] },
+        "note": { "type": "string", "maxLength": 240 },
+        "isPublic": { "type": "boolean" },
+        "displayOrder": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "category", "proficiency", "isPublic", "displayOrder", "createdAt", "updatedAt"]
+    },
+    "Experience": {
+      "title": "Experience",
+      "description": "Work or internship experience entry with optional ambiguity review flag.",
+      "type": "object",
+      "properties": {
+        "organization": { "type": "string", "maxLength": 160 },
+        "location": { "type": "string", "maxLength": 120 },
+        "role": { "type": "string", "maxLength": 160 },
+        "period": { "type": "string", "maxLength": 100 },
+        "entryType": { "type": "string", "enum": ["Work Experience", "Internship", "Draft Record"] },
+        "summary": { "type": "string", "maxLength": 1500 },
+        "highlights": { "type": "array" },
+        "ambiguityFlag": { "type": "boolean" },
+        "ambiguityNote": { "type": "string", "maxLength": 600 },
+        "isPublic": { "type": "boolean" },
+        "displayOrder": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["organization", "role", "period", "entryType", "summary", "highlights", "ambiguityFlag", "isPublic", "displayOrder", "createdAt", "updatedAt"]
+    },
+    "Education": {
+      "title": "Education",
+      "description": "Academic qualification and coursework record.",
+      "type": "object",
+      "properties": {
+        "institution": { "type": "string", "maxLength": 160 },
+        "qualification": { "type": "string", "maxLength": 160 },
+        "expectedGraduation": { "type": "string", "maxLength": 60 },
+        "statusLabel": { "type": "string", "maxLength": 80 },
+        "location": { "type": "string", "maxLength": 160 },
+        "coursework": { "type": "array" },
+        "notes": { "type": "string", "maxLength": 800 },
+        "isPublic": { "type": "boolean" },
+        "displayOrder": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["institution", "qualification", "expectedGraduation", "statusLabel", "location", "coursework", "isPublic", "displayOrder", "createdAt", "updatedAt"]
+    },
+    "PendingApproval": {
+      "title": "PendingApproval",
+      "description": "Proposed portfolio change from GitHub automation or Gemini AI awaiting administrator approval.",
+      "type": "object",
+      "properties": {
+        "category": { "type": "string", "enum": ["new_repo", "repo_update", "bio_update", "skill_update", "experience_update", "cv_update", "seo_update", "ai_suggestion"] },
+        "targetType": { "type": "string", "enum": ["project", "profile", "skill", "experience", "cv", "seo"] },
+        "targetId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "explanation": { "type": "string", "maxLength": 1500 },
+        "previousContentJson": { "type": "string", "maxLength": 30000 },
+        "proposedContentJson": { "type": "string", "maxLength": 30000 },
+        "source": { "type": "string", "enum": ["github_sync", "gemini_ai", "manual_draft"] },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "edited_approved"] },
+        "reviewerNote": { "type": "string", "maxLength": 600 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["category", "targetType", "targetId", "title", "explanation", "previousContentJson", "proposedContentJson", "source", "status", "createdAt", "updatedAt"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable administrative audit trail of approval actions and synchronization events.",
+      "type": "object",
+      "properties": {
+        "action": { "type": "string", "maxLength": 80 },
+        "entityType": { "type": "string", "maxLength": 80 },
+        "entityId": { "type": "string", "maxLength": 128 },
+        "summary": { "type": "string", "maxLength": 500 },
+        "actorEmail": { "type": "string", "maxLength": 160 },
+        "detailsJson": { "type": "string", "maxLength": 8000 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["action", "entityType", "entityId", "summary", "actorEmail", "createdAt"]
+    },
+    "CvVersion": {
+      "title": "CvVersion",
+      "description": "Private CV archive versions managed by the administrator.",
+      "type": "object",
+      "properties": {
+        "versionLabel": { "type": "string", "maxLength": 80 },
+        "fileName": { "type": "string", "maxLength": 200 },
+        "mimeType": { "type": "string", "maxLength": 100 },
+        "fileSize": { "type": "integer" },
+        "dataBase64": { "type": "string", "maxLength": 850000 },
+        "notes": { "type": "string", "maxLength": 500 },
+        "isPublicApproved": { "type": "boolean" },
+        "uploadedByEmail": { "type": "string", "maxLength": 160 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["versionLabel", "fileName", "mimeType", "fileSize", "dataBase64", "isPublicApproved", "uploadedByEmail", "createdAt", "updatedAt"]
+    },
+    "GithubSettings": {
+      "title": "GithubSettings",
+      "description": "Private configuration for GitHub automation and approval workflows.",
+      "type": "object",
+      "properties": {
+        "syncFrequencyMinutes": { "type": "integer" },
+        "autoMetadataRefresh": { "type": "boolean" },
+        "detectNewRepos": { "type": "boolean" },
+        "detectReadmeChanges": { "type": "boolean" },
+        "generateAiSuggestions": { "type": "boolean" },
+        "emailNotifications": { "type": "boolean" },
+        "requireApprovalBeforePublish": { "type": "boolean" },
+        "lastSyncAt": { "type": "string", "maxLength": 80 },
+        "lastSyncStatus": { "type": "string", "maxLength": 80 },
+        "lastSyncSummary": { "type": "string", "maxLength": 500 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["syncFrequencyMinutes", "autoMetadataRefresh", "detectNewRepos", "detectReadmeChanges", "generateAiSuggestions", "emailNotifications", "requireApprovalBeforePublish", "updatedAt"]
+    },
+    "ContactMessage": {
+      "title": "ContactMessage",
+      "description": "Contact form submission stored privately for administrator review.",
+      "type": "object",
+      "properties": {
+        "senderName": { "type": "string", "maxLength": 120 },
+        "senderEmail": { "type": "string", "maxLength": 160 },
+        "subject": { "type": "string", "maxLength": 200 },
+        "message": { "type": "string", "maxLength": 4000 },
+        "emailDelivered": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["unread", "read", "replied", "archived"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["senderName", "senderEmail", "subject", "message", "emailDelivered", "status", "createdAt"]
+    },
+    "AnalyticsEvent": {
+      "title": "AnalyticsEvent",
+      "description": "Privacy-conscious portfolio analytics event.",
+      "type": "object",
+      "properties": {
+        "eventType": { "type": "string", "enum": ["page_view", "project_view", "cv_download", "contact_submit"] },
+        "targetSlug": { "type": "string", "maxLength": 140 },
+        "referrer": { "type": "string", "maxLength": 300 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["eventType", "targetSlug", "referrer", "createdAt"]
+    },
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Authorized administrator registry document.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "maxLength": 160 },
+        "role": { "type": "string", "enum": ["admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "role", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/test/{docId}": {
+      "schema": { "$ref": "#/entities/PortfolioProfile" },
+      "description": "Connection verification document path."
+    },
+    "/admins/{uid}": {
+      "schema": { "$ref": "#/entities/AdminUser" },
+      "description": "Administrator registry."
+    },
+    "/portfolio_public/profile": {
+      "schema": { "$ref": "#/entities/PortfolioProfile" },
+      "description": "Public portfolio profile document."
+    },
+    "/portfolio_public/github_cache": {
+      "schema": { "$ref": "#/entities/GithubCache" },
+      "description": "Publicly cached GitHub statistics and repositories."
+    },
+    "/portfolio_public/approved_cv": {
+      "schema": { "$ref": "#/entities/ApprovedCv" },
+      "description": "Latest approved public CV PDF."
+    },
+    "/projects/{projectId}": {
+      "schema": { "$ref": "#/entities/Project" },
+      "description": "Portfolio software projects."
+    },
+    "/skills/{skillId}": {
+      "schema": { "$ref": "#/entities/Skill" },
+      "description": "Categorized technical skills."
+    },
+    "/experiences/{expId}": {
+      "schema": { "$ref": "#/entities/Experience" },
+      "description": "Professional and internship experiences."
+    },
+    "/education/{eduId}": {
+      "schema": { "$ref": "#/entities/Education" },
+      "description": "Academic education records."
+    },
+    "/pending_approvals/{approvalId}": {
+      "schema": { "$ref": "#/entities/PendingApproval" },
+      "description": "Admin-only approval queue."
+    },
+    "/audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Admin-only immutable audit log."
+    },
+    "/cv_versions/{versionId}": {
+      "schema": { "$ref": "#/entities/CvVersion" },
+      "description": "Admin-only private CV version history."
+    },
+    "/github_settings/{configId}": {
+      "schema": { "$ref": "#/entities/GithubSettings" },
+      "description": "Admin-only GitHub automation configuration."
+    },
+    "/contact_messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ContactMessage" },
+      "description": "Contact form messages (public create, admin read/manage)."
+    },
+    "/analytics_events/{eventId}": {
+      "schema": { "$ref": "#/entities/AnalyticsEvent" },
+      "description": "Privacy-conscious analytics events (public create, admin read)."
+    }
+  }
+}
