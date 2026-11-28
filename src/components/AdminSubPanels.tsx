@@ -190,18 +190,14 @@ export function ApprovalsPanel({ approvals }: { approvals: PendingApproval[] }) 
                   </span>
                 </div>
 
-                <p className="text-sm text-[#68635d] dark:text-[#b9aea2]">
-                  {item.explanation}
-                </p>
+                <div className="rounded-xl border border-[#e4cdb9] dark:border-[#654832] bg-white/70 dark:bg-[#171310]/70 p-4"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9b6847] mb-1">Why this is waiting</p><p className="text-sm leading-relaxed text-[#514941] dark:text-[#e1d6ca]">{item.explanation}</p></div>
 
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <p className="text-xs font-semibold text-[#68635d] dark:text-[#b9aea2]">
                       What is there now
                     </p>
-                    <pre className="text-[11px] font-mono-tabular bg-[#f7f3ed] dark:bg-[#111110] border border-[#ddd4c9] dark:border-[#2c2925] rounded-xl p-3.5 overflow-x-auto max-h-56 text-[#161616] dark:text-[#f7f3ed]">
-                      {item.previousContentJson || 'No previous version — this is a new item.'}
-                    </pre>
+                    <ApprovalContentPreview json={item.previousContentJson} emptyLabel="No previous version — this is a new item." />
                   </div>
                   <div className="space-y-1.5">
                     <p className="text-xs font-semibold text-[#68635d] dark:text-[#b9aea2]">
@@ -215,9 +211,7 @@ export function ApprovalsPanel({ approvals }: { approvals: PendingApproval[] }) 
                         className="w-full text-[11px] font-mono-tabular bg-[#f7f3ed] dark:bg-[#111110] border border-[#b98b6e] rounded-xl p-3.5 text-[#161616] dark:text-[#f7f3ed] focus:outline-none"
                       />
                     ) : (
-                      <pre className="text-[11px] font-mono-tabular bg-[#f7f3ed] dark:bg-[#111110] border border-[#ddd4c9] dark:border-[#2c2925] rounded-xl p-3.5 overflow-x-auto max-h-56 text-[#161616] dark:text-[#f7f3ed]">
-                        {item.proposedContentJson}
-                      </pre>
+                      <ApprovalContentPreview json={item.proposedContentJson} emptyLabel="No proposed details were supplied." />
                     )}
                   </div>
                 </div>
