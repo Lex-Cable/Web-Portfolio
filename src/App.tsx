@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
-import { onAuthStateChanged, type User } from 'firebase/auth';
+import { multiFactor, onAuthStateChanged, type User } from 'firebase/auth';
 import { Download, FileText, X } from 'lucide-react';
 import { ADMIN_EMAIL, auth, testFirestoreConnection } from './lib/firebase';
 import {
@@ -124,7 +124,10 @@ export default function App() {
   const [analytics, setAnalytics] = useState<AnalyticsEvent[]>([]);
 
   const isAdmin = Boolean(
-    user && user.emailVerified && user.email?.toLowerCase() === ADMIN_EMAIL
+    user &&
+      user.emailVerified &&
+      user.email?.toLowerCase() === ADMIN_EMAIL &&
+      multiFactor(user).enrolledFactors.some((factor) => factor.factorId === 'totp')
   );
 
   // Theme synchronization
