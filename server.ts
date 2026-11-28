@@ -10,7 +10,7 @@ import { createServer as createViteServer } from 'vite';
 import { fetchGitHubSnapshot, fetchRepositoryFullDetails } from './server/githubService.ts';
 import { fetchGitLabSnapshot } from './server/gitlabService.ts';
 import { analyzeRepositoryWithGemini, generatePortfolioAdvisory } from './server/geminiService.ts';
-import { sendContactEmail } from './server/emailService.ts';
+import { sendContactEmail, sendContactReply } from './server/emailService.ts';
 import type { GithubRepoSummary, GithubSnapshot, GitlabSnapshot, Project } from './src/types/portfolio.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -766,6 +766,35 @@ async function startServer() {
       res.status(500).json({
         error: err instanceof Error ? err.message : 'Unable to process contact submission.',
       });
+    }
+  });
+
+  // Send a direct reply to a contact form message (administrator only).
+  app.post('/api/admin/contact-reply', adminApiLimiter, requireAdmin, async (req: AuthedRequest, res) => {
+    try {
+      const { senderName, senderEmail, subject, reply } = (req.body || {}) as {
+        senderName?: string;
+        senderEmail?: string;
+        subject?: string;
+        reply?: string;
+      };
+      const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+      if (!senderName || senderName.trim().length < 2 || senderName.length > 120 ||
+          !senderEmail || !emailRegex.test(senderEmail) || senderEmail.length > 160 ||
+          !subject || subject.trim().length < 2 || subject.length > 200 ||
+          !reply || reply.trim().length < 2 || reply.length > 5000) {
+        res.status(400).json({ error: 'Please check the recipient, subject, and reply. The reply must contain 2–5,000 characters.' });
+        return;
+      }
+      await sendContactReply({
+        senderName: senderName.trim(),
+        senderEmail: senderEmail.trim(),
+        subject: subject.trim(),
+        reply: reply.trim(),
+      });
+      res.json({ ok: true, message: 'Reply sent successfully.' });
+    } catch (err) {
+      res.status(502).json({ error: err instanceof Error ? err.message : 'Unable to send the reply.' });
     }
   });
 
