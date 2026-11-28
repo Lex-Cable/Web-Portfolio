@@ -1266,7 +1266,7 @@ export function InboxAnalyticsAuditPanel({
     }
   };
 
-  const readableAction = (value: string) => value.replace(/[_-]+/g, ' ').replace(/\\b\\w/g, (letter) => letter.toUpperCase());
+  const readableAction = (value: string) => value.replace(/[_-]+/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
   const readableDate = (value?: string) => {
     if (!value) return 'Time not recorded';
     const date = new Date(value);
