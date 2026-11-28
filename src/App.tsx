@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { Download, FileText, X } from 'lucide-react';
 import { ADMIN_EMAIL, auth, testFirestoreConnection } from './lib/firebase';
@@ -62,15 +62,33 @@ import {
 } from './utils/safeFetchJson';
 import { Layout } from './components/Layout';
 import { HomeSection } from './components/HomeSection';
-import { AboutSection } from './components/AboutSection';
-import { SkillsSection } from './components/SkillsSection';
-import { ProjectsSection } from './components/ProjectsSection';
-import { GithubActivitySection } from './components/GithubActivitySection';
-import { GitlabActivitySection } from './components/GitlabActivitySection';
-import { BusinessManagementSection } from './components/BusinessManagementSection';
-import { ExperienceSection } from './components/ExperienceSection';
-import { ContactSection } from './components/ContactSection';
-import { AdminDashboard } from './components/AdminDashboard';
+const AboutSection = lazy(() =>
+  import('./components/AboutSection').then((module) => ({ default: module.AboutSection }))
+);
+const SkillsSection = lazy(() =>
+  import('./components/SkillsSection').then((module) => ({ default: module.SkillsSection }))
+);
+const ProjectsSection = lazy(() =>
+  import('./components/ProjectsSection').then((module) => ({ default: module.ProjectsSection }))
+);
+const GithubActivitySection = lazy(() =>
+  import('./components/GithubActivitySection').then((module) => ({ default: module.GithubActivitySection }))
+);
+const GitlabActivitySection = lazy(() =>
+  import('./components/GitlabActivitySection').then((module) => ({ default: module.GitlabActivitySection }))
+);
+const BusinessManagementSection = lazy(() =>
+  import('./components/BusinessManagementSection').then((module) => ({ default: module.BusinessManagementSection }))
+);
+const ExperienceSection = lazy(() =>
+  import('./components/ExperienceSection').then((module) => ({ default: module.ExperienceSection }))
+);
+const ContactSection = lazy(() =>
+  import('./components/ContactSection').then((module) => ({ default: module.ContactSection }))
+);
+const AdminDashboard = lazy(() =>
+  import('./components/AdminDashboard').then((module) => ({ default: module.AdminDashboard }))
+);
 
 export default function App() {
   const [currentPath, setCurrentPath] = useState<string>(
@@ -577,7 +595,15 @@ export default function App() {
       isAdmin={isAdmin}
       pendingCount={pendingCount}
     >
-      {renderRoute()}
+      <Suspense
+        fallback={
+          <div className="min-h-[50vh] flex items-center justify-center text-sm text-[#8b8178]">
+            Loading page...
+          </div>
+        }
+      >
+        {renderRoute()}
+      </Suspense>
 
       {cvPreviewUrl && (
         <div
