@@ -353,25 +353,17 @@ export default function App() {
           err instanceof Error ? err.message : 'Unable to reach GitLab snapshot endpoint.';
       }
 
-      // Fallback to GitLab's public CORS-enabled REST API using the visitor's own quota
-      try {
-        const directSnapshot = await fetchDirectPublicGitlabSnapshot('lex_cab23');
-        setGitlabSnapshot((existing) => mergeGitlabSnapshots(existing, directSnapshot));
-        setGitlabError(null);
-        return;
-      } catch (directErr) {
-        const fallbackMsg =
-          directErr instanceof Error ? directErr.message : backendFailureMessage;
-        setGitlabSnapshot((existing) => {
-          if (forceRefresh) {
-            setGitlabError(
-              fallbackMsg ||
-                'GitLab public API rate limit reached temporarily; showing cached workspace data.'
-            );
-          }
-          return existing || createBaselineGitlabSnapshot();
-        });
-      }
+      // Keep the server-side cached snapshot as the single source of truth.
+      // A browser fallback would consume a second GitLab quota and amplify upstream 429s.
+      setGitlabSnapshot((existing) => {
+        if (forceRefresh) {
+          setGitlabError(
+            backendFailureMessage ||
+              'GitLab is temporarily unavailable; showing the last cached workspace data.'
+          );
+        }
+        return existing || createBaselineGitlabSnapshot();
+      });
     } finally {
       setGitlabLoading(false);
     }
