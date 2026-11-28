@@ -35,8 +35,8 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isBootstrappedAdminEmail() ||
-        (isVerifiedUser() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+      // This portfolio has exactly one administrator; no UID registry can bypass the email + MFA gate.
+      return isBootstrappedAdminEmail();
     }
 
     function isValidString(val, minLen, maxLen) {
