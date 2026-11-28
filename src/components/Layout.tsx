@@ -19,6 +19,7 @@ const NAV_LINKS = [
   { label: 'Projects', path: '/projects' },
   { label: 'GitHub', path: '/github' },
   { label: 'GitLab', path: '/gitlab' },
+  { label: 'Business & Management', path: '/business-management' },
   { label: 'Experience', path: '/experience' },
 ];
 

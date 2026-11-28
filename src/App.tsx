@@ -67,6 +67,7 @@ import { SkillsSection } from './components/SkillsSection';
 import { ProjectsSection } from './components/ProjectsSection';
 import { GithubActivitySection } from './components/GithubActivitySection';
 import { GitlabActivitySection } from './components/GitlabActivitySection';
+import { BusinessManagementSection } from './components/BusinessManagementSection';
 import { ExperienceSection } from './components/ExperienceSection';
 import { ContactSection } from './components/ContactSection';
 import { AdminDashboard } from './components/AdminDashboard';
@@ -145,6 +146,7 @@ export default function App() {
       '/projects': `Software Projects — ${profile.name}`,
       '/github': `GitHub Activity — ${profile.name}`,
       '/gitlab': `GitLab Activity — ${profile.name}`,
+      '/business-management': `Business & Management — ${profile.name}`,
       '/experience': `Experience & Education — ${profile.name}`,
       '/contact': `Contact — ${profile.name}`,
       '/admin': `Admin Console — ${profile.name}`,
@@ -499,6 +501,17 @@ export default function App() {
           loading={gitlabLoading}
           error={gitlabError}
           onRefreshPublic={() => void fetchLiveGitlabSnapshot(true)}
+        />
+      );
+    }
+    if (currentPath === '/business-management') {
+      return (
+        <BusinessManagementSection
+          profile={profile}
+          experiences={experiences}
+          education={education}
+          onDownloadCv={handleDownloadCv}
+          onPreviewCv={handlePreviewCv}
         />
       );
     }
