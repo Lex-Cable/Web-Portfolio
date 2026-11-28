@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   addDoc, collection, deleteDoc, doc, getDocs, limit, orderBy, query,
-  serverTimestamp, setDoc, writeBatch,
+  serverTimestamp, setDoc, Timestamp, writeBatch,
 } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 
@@ -39,6 +39,29 @@ const EXPORT_COLLECTIONS = [
 
 function pretty(value: unknown) {
   return JSON.stringify(value, null, 2);
+}
+
+function encodeBackupValue(value: unknown): unknown {
+  if (value instanceof Timestamp) {
+    return { __backupType: 'timestamp', seconds: value.seconds, nanoseconds: value.nanoseconds };
+  }
+  if (Array.isArray(value)) return value.map(encodeBackupValue);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, encodeBackupValue(item)]));
+  }
+  return value;
+}
+
+function decodeBackupValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(decodeBackupValue);
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    if (record.__backupType === 'timestamp' && typeof record.seconds === 'number' && typeof record.nanoseconds === 'number') {
+      return new Timestamp(record.seconds, record.nanoseconds);
+    }
+    return Object.fromEntries(Object.entries(record).map(([key, item]) => [key, decodeBackupValue(item)]));
+  }
+  return value;
 }
 
 function downloadJson(name: string, value: unknown) {
@@ -146,7 +169,7 @@ export function AdminExpansionPanel() {
       const data: Record<string, Array<{ id: string; data: Record<string, unknown> }>> = {};
       for (const name of EXPORT_COLLECTIONS) {
         const snap = await getDocs(query(collection(db, name), limit(500)));
-        data[name] = snap.docs.map((item) => ({ id: item.id, data: item.data() as Record<string, unknown> }));
+        data[name] = snap.docs.map((item) => ({ id: item.id, data: encodeBackupValue(item.data()) as Record<string, unknown> }));
       }
       backup.collections = data;
       downloadJson(`web-portfolio-backup-${new Date().toISOString().slice(0, 10)}.json`, backup);
@@ -172,7 +195,7 @@ export function AdminExpansionPanel() {
           const batch = writeBatch(db);
           for (const row of rows.slice(offset, offset + 400)) {
             if (!row.id || !row.data || typeof row.data !== 'object') throw new Error(`Invalid record in ${name}`);
-            batch.set(doc(db, name, row.id), row.data, { merge: true });
+            batch.set(doc(db, name, row.id), decodeBackupValue(row.data) as Record<string, unknown>, { merge: true });
           }
           await batch.commit();
         }
