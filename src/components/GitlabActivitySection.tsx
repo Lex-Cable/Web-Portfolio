@@ -183,18 +183,7 @@ export function GitlabActivitySection({
             <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#161616] dark:text-[#fffdf9] text-balance">
               GitLab Profile, Member Projects & Activity
             </h1>
-            <p className="text-sm sm:text-base text-[#68635d] dark:text-[#b9aea2]">
-              GitLab workspace overview for{' '}
-              <a
-                href={profileUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="font-semibold text-[#b98b6e] hover:underline"
-              >
-                @{snapshot?.username || 'lex_cab23'}
-              </a>
-              , synchronized with portfolio projects and member engineering contributions.
-            </p>
+        </p>
           </div>
           <div className="flex flex-wrap items-center gap-3 shrink-0">
             {refreshedNotice && (
