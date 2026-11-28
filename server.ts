@@ -857,7 +857,7 @@ async function startServer() {
   reconfigureScheduler();
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Portfolio server running at http://0.0.0.0:${PORT}`);
+    console.log(`Portfolio server running at http://localhost:${PORT}`);
   });
 }
 
@@ -865,3 +865,6 @@ startServer().catch((err) => {
   console.error('Fatal server startup error:', err);
   process.exit(1);
 });
+
+
+
