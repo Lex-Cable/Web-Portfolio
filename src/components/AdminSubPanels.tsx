@@ -11,6 +11,9 @@ import {
   AlertTriangle,
   Download,
   Eye,
+  Mail,
+  Send,
+  Activity,
 } from 'lucide-react';
 import type {
   AnalyticsEvent,
