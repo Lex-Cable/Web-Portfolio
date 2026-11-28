@@ -188,24 +188,27 @@ export async function seedInitialPortfolioIfEmpty(): Promise<boolean> {
   }
 
   for (const skill of DEFAULT_SKILLS) {
-    batch.set(doc(db, 'skills', skill.id), {
-      ...skill,
+    const { id, ...skillFields } = skill;
+    batch.set(doc(db, 'skills', id), {
+      ...skillFields,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
   }
 
   for (const exp of DEFAULT_EXPERIENCES) {
-    batch.set(doc(db, 'experiences', exp.id), {
-      ...exp,
+    const { id, ...experienceFields } = exp;
+    batch.set(doc(db, 'experiences', id), {
+      ...experienceFields,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
   }
 
   for (const edu of DEFAULT_EDUCATION) {
-    batch.set(doc(db, 'education', edu.id), {
-      ...edu,
+    const { id, ...educationFields } = edu;
+    batch.set(doc(db, 'education', id), {
+      ...educationFields,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
