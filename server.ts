@@ -56,8 +56,8 @@ async function requireAdmin(req: AuthedRequest, res: Response, next: NextFunctio
   }
   try {
     const decoded = await getAuth().verifyIdToken(match[1]);
-    if (!decoded.email_verified || (decoded.email || '').toLowerCase() !== ADMIN_EMAIL || decoded.firebase?.sign_in_second_factor !== 'totp') {
-      res.status(403).json({ error: 'Forbidden: the allowlisted administrator must complete TOTP two-factor authentication.' });
+    if (!decoded.email_verified || (decoded.email || '').toLowerCase() !== ADMIN_EMAIL) {
+      res.status(403).json({ error: 'Forbidden: only the verified, allowlisted administrator may access this resource.' });
       return;
     }
     req.adminEmail = decoded.email;
