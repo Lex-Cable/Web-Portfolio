@@ -7,7 +7,6 @@ import {
   Calculator,
   ChartNoAxesCombined,
   ClipboardCheck,
-  FileSearch,
   Handshake,
   Landmark,
   Scale,
