@@ -124,7 +124,9 @@ export default function App() {
   const [analytics, setAnalytics] = useState<AnalyticsEvent[]>([]);
 
   const isAdmin = Boolean(
-    user && user.emailVerified && user.email?.toLowerCase() === ADMIN_EMAIL
+    user &&
+      user.emailVerified &&
+      user.email?.toLowerCase() === ADMIN_EMAIL
   );
 
   // Theme synchronization

@@ -16,7 +16,7 @@ import type { GithubRepoSummary, GithubSnapshot, GitlabSnapshot, Project } from 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'jaccie.wambui26@gmail.com').toLowerCase();
+const ADMIN_EMAIL = 'jaccie.wambui26@gmail.com';
 const GITHUB_USERNAME = process.env.GITHUB_USERNAME || 'Lex-Cable';
 const GITLAB_USERNAME = process.env.GITLAB_USERNAME || 'lex_cab23';
 const PORT = Number(process.env.PORT || 3000);
@@ -57,7 +57,7 @@ async function requireAdmin(req: AuthedRequest, res: Response, next: NextFunctio
   try {
     const decoded = await getAuth().verifyIdToken(match[1]);
     if (!decoded.email_verified || (decoded.email || '').toLowerCase() !== ADMIN_EMAIL) {
-      res.status(403).json({ error: 'Forbidden: verified administrator account required.' });
+      res.status(403).json({ error: 'Forbidden: only the verified, allowlisted administrator may access this resource.' });
       return;
     }
     req.adminEmail = decoded.email;

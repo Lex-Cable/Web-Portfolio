@@ -159,7 +159,11 @@ export function AdminDashboard({
   const handleGoogleLogin = async () => {
     setAuthError(null);
     try {
-      await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(auth, googleProvider);
+      if (result.user.email?.toLowerCase() !== ADMIN_EMAIL || !result.user.emailVerified) {
+        await signOut(auth);
+        setAuthError(`Access is restricted to the verified administrator account (${ADMIN_EMAIL}).`);
+      }
     } catch (err) {
       setAuthError(err instanceof Error ? err.message : 'Sign-in failed.');
     }
