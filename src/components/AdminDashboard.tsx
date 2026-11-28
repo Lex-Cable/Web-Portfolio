@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getMultiFactorResolver, multiFactor, signInWithPopup, signOut, TotpMultiFactorGenerator, reauthenticateWithPopup, type MultiFactorError, type MultiFactorResolver, type TotpSecret, type User } from 'firebase/auth';
+import { signInWithPopup, signOut, type User } from 'firebase/auth';
 import {
   Bot,
   CheckSquare,
@@ -99,11 +99,6 @@ export function AdminDashboard({
 }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>('approvals');
   const [authError, setAuthError] = useState<string | null>(null);
-  const [totpSecret, setTotpSecret] = useState<TotpSecret | null>(null);
-  const [totpCode, setTotpCode] = useState('');
-  const [mfaResolver, setMfaResolver] = useState<MultiFactorResolver | null>(null);
-  const [mfaFactorUid, setMfaFactorUid] = useState<string | null>(null);
-  const [mfaBusy, setMfaBusy] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [settingsForm, setSettingsForm] = useState<GithubSettings>(githubSettings);
@@ -164,85 +159,13 @@ export function AdminDashboard({
   const handleGoogleLogin = async () => {
     setAuthError(null);
     try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (err) {
-      const authErr = err as MultiFactorError;
-      if (authErr.code === 'auth/multi-factor-auth-required') {
-        try {
-          const resolver = getMultiFactorResolver(auth, authErr);
-          const totpHint = resolver.hints.find((hint) => hint.factorId === TotpMultiFactorGenerator.FACTOR_ID);
-          if (!totpHint) {
-            setAuthError('No authenticator-app factor is available for this account. Contact the project administrator.');
-            return;
-          }
-          setMfaResolver(resolver);
-          setMfaFactorUid(totpHint.uid);
-          setTotpCode('');
-          return;
-        } catch {
-          setAuthError('Unable to start the two-factor challenge. Please try signing in again.');
-          return;
-        }
+      const result = await signInWithPopup(auth, googleProvider);
+      if (result.user.email?.toLowerCase() !== ADMIN_EMAIL || !result.user.emailVerified) {
+        await signOut(auth);
+        setAuthError(`Access is restricted to the verified administrator account (${ADMIN_EMAIL}).`);
       }
+    } catch (err) {
       setAuthError(err instanceof Error ? err.message : 'Sign-in failed.');
-    }
-  };
-
-  const handleStartTotpEnrollment = async () => {
-    if (!user || user.email?.toLowerCase() !== ADMIN_EMAIL) return;
-    setMfaBusy(true);
-    setAuthError(null);
-    try {
-      await reauthenticateWithPopup(user, googleProvider);
-      const session = await multiFactor(auth.currentUser || user).getSession();
-      const secret = await TotpMultiFactorGenerator.generateSecret(session);
-      setTotpSecret(secret);
-      setTotpCode('');
-    } catch (err) {
-      setAuthError(err instanceof Error ? err.message : 'Unable to start authenticator setup.');
-    } finally {
-      setMfaBusy(false);
-    }
-  };
-
-  const handleVerifyTotpEnrollment = async () => {
-    if (!user || !totpSecret || !/^\d{6}$/.test(totpCode.trim())) {
-      setAuthError('Enter the six-digit code from your authenticator app.');
-      return;
-    }
-    setMfaBusy(true);
-    setAuthError(null);
-    try {
-      const assertion = TotpMultiFactorGenerator.assertionForEnrollment(totpSecret, totpCode.trim());
-      await multiFactor(user).enroll(assertion, 'Portfolio authenticator');
-      await signOut(auth);
-      setTotpSecret(null);
-      setTotpCode('');
-      setAuthError('Authenticator enrolled. Sign in again and complete the authenticator challenge to open the Admin Console.');
-    } catch (err) {
-      setAuthError(err instanceof Error ? err.message : 'Authenticator verification failed.');
-    } finally {
-      setMfaBusy(false);
-    }
-  };
-
-  const handleVerifyTotpSignIn = async () => {
-    if (!mfaResolver || !mfaFactorUid || !/^\d{6}$/.test(totpCode.trim())) {
-      setAuthError('Enter the six-digit code from your authenticator app.');
-      return;
-    }
-    setMfaBusy(true);
-    setAuthError(null);
-    try {
-      const assertion = TotpMultiFactorGenerator.assertionForSignIn(mfaFactorUid, totpCode.trim());
-      await mfaResolver.resolveSignIn(assertion);
-      setMfaResolver(null);
-      setMfaFactorUid(null);
-      setTotpCode('');
-    } catch (err) {
-      setAuthError(err instanceof Error ? err.message : 'Two-factor verification failed.');
-    } finally {
-      setMfaBusy(false);
     }
   };
 
@@ -498,33 +421,6 @@ export function AdminDashboard({
     );
   }
 
-  if (mfaResolver) {
-    return (
-      <div className="max-w-md mx-auto px-5 py-20">
-        <div className="bg-[#fffdf9] dark:bg-[#191816] border border-[#ddd4c9] dark:border-[#2c2925] rounded-2xl p-8 space-y-5 text-center">
-          <Lock className="w-6 h-6 text-[#b98b6e] mx-auto" />
-          <h1 className="text-xl font-bold text-[#161616] dark:text-[#fffdf9]">Two-factor verification</h1>
-          <p className="text-sm text-[#68635d] dark:text-[#b9aea2]">Enter the current six-digit code from your authenticator app to complete administrator sign-in.</p>
-          <input
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-            value={totpCode}
-            onChange={(event) => setTotpCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-            aria-label="Authenticator verification code"
-            className="w-full rounded-xl border border-[#ddd4c9] dark:border-[#2c2925] bg-transparent px-4 py-3 text-center text-xl tracking-[0.4em] font-mono"
-            placeholder="000000"
-          />
-          {authError && <p className="text-xs text-red-600 dark:text-red-400">{authError}</p>}
-          <button type="button" disabled={mfaBusy || totpCode.length !== 6} onClick={() => void handleVerifyTotpSignIn()} className="w-full px-5 py-3 text-sm font-semibold rounded-full bg-[#161616] dark:bg-[#b98b6e] text-white dark:text-[#161616] disabled:opacity-50">
-            {mfaBusy ? 'Verifying…' : 'Verify and continue'}
-          </button>
-          <button type="button" onClick={() => { setMfaResolver(null); setMfaFactorUid(null); setTotpCode(''); }} className="text-xs underline text-[#68635d]">Cancel sign-in</button>
-        </div>
-      </div>
-    );
-  }
-
   if (!user) {
     return (
       <div className="max-w-md mx-auto px-5 py-20">
@@ -550,50 +446,6 @@ export function AdminDashboard({
           >
             Sign in with Google
           </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (
-    user.emailVerified &&
-    user.email?.toLowerCase() === ADMIN_EMAIL &&
-    !multiFactor(user).enrolledFactors.some((factor) => factor.factorId === TotpMultiFactorGenerator.FACTOR_ID)
-  ) {
-    return (
-      <div className="max-w-md mx-auto px-5 py-20">
-        <div className="bg-[#fffdf9] dark:bg-[#191816] border border-[#ddd4c9] dark:border-[#2c2925] rounded-2xl p-8 space-y-5">
-          <div className="w-12 h-12 rounded-full border border-[#ddd4c9] dark:border-[#2c2925] bg-[#f7f3ed] dark:bg-[#111110] flex items-center justify-center mx-auto">
-            <Lock className="w-5 h-5 text-[#b98b6e]" />
-          </div>
-          <h1 className="text-xl font-bold text-center text-[#161616] dark:text-[#fffdf9]">Set up administrator two-factor authentication</h1>
-          <p className="text-sm text-center text-[#68635d] dark:text-[#b9aea2]">Before the Admin Console can be used, enrol an authenticator app for {ADMIN_EMAIL}. Install an authenticator such as Google Authenticator or Microsoft Authenticator.</p>
-          {!totpSecret ? (
-            <button type="button" disabled={mfaBusy} onClick={() => void handleStartTotpEnrollment()} className="w-full px-5 py-3 text-sm font-semibold rounded-full bg-[#161616] dark:bg-[#b98b6e] text-white dark:text-[#161616] disabled:opacity-50">
-              {mfaBusy ? 'Preparing setup…' : 'Set up authenticator'}
-            </button>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-xs text-[#68635d] dark:text-[#b9aea2]">In your authenticator app, add an account manually using this secret:</p>
-              <code className="block break-all rounded-xl bg-[#f4f0e9] dark:bg-[#111110] p-3 text-sm text-center select-all">{totpSecret.secretKey}</code>
-              <p className="text-xs text-[#68635d] dark:text-[#b9aea2]">Account: {ADMIN_EMAIL} · Issuer: Web Portfolio</p>
-              <input
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                maxLength={6}
-                value={totpCode}
-                onChange={(event) => setTotpCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                aria-label="Authenticator setup code"
-                className="w-full rounded-xl border border-[#ddd4c9] dark:border-[#2c2925] bg-transparent px-4 py-3 text-center text-xl tracking-[0.4em] font-mono"
-                placeholder="000000"
-              />
-              <button type="button" disabled={mfaBusy || totpCode.length !== 6} onClick={() => void handleVerifyTotpEnrollment()} className="w-full px-5 py-3 text-sm font-semibold rounded-full bg-[#161616] dark:bg-[#b98b6e] text-white dark:text-[#161616] disabled:opacity-50">
-                {mfaBusy ? 'Verifying…' : 'Verify and enable two-factor'}
-              </button>
-            </div>
-          )}
-          {authError && <p className="text-xs text-red-600 dark:text-red-400">{authError}</p>}
-          <button type="button" onClick={() => void signOut(auth)} className="w-full text-xs underline text-[#68635d]">Sign out</button>
         </div>
       </div>
     );
