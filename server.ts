@@ -778,7 +778,7 @@ async function startServer() {
         subject?: string;
         reply?: string;
       };
-      const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!senderName || senderName.trim().length < 2 || senderName.length > 120 ||
           !senderEmail || !emailRegex.test(senderEmail) || senderEmail.length > 160 ||
           !subject || subject.trim().length < 2 || subject.length > 200 ||
