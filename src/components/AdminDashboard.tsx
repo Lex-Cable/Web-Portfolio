@@ -205,7 +205,7 @@ export function AdminDashboard({
   };
 
   const handleVerifyTotpEnrollment = async () => {
-    if (!user || !totpSecret || !/^\\d{6}$/.test(totpCode.trim())) {
+    if (!user || !totpSecret || !/^\d{6}$/.test(totpCode.trim())) {
       setAuthError('Enter the six-digit code from your authenticator app.');
       return;
     }
@@ -226,7 +226,7 @@ export function AdminDashboard({
   };
 
   const handleVerifyTotpSignIn = async () => {
-    if (!mfaResolver || !mfaFactorUid || !/^\\d{6}$/.test(totpCode.trim())) {
+    if (!mfaResolver || !mfaFactorUid || !/^\d{6}$/.test(totpCode.trim())) {
       setAuthError('Enter the six-digit code from your authenticator app.');
       return;
     }
@@ -509,7 +509,7 @@ export function AdminDashboard({
             autoComplete="one-time-code"
             maxLength={6}
             value={totpCode}
-            onChange={(event) => setTotpCode(event.target.value.replace(/\\D/g, '').slice(0, 6))}
+            onChange={(event) => setTotpCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
             aria-label="Authenticator verification code"
             className="w-full rounded-xl border border-[#ddd4c9] dark:border-[#2c2925] bg-transparent px-4 py-3 text-center text-xl tracking-[0.4em] font-mono"
             placeholder="000000"
@@ -581,7 +581,7 @@ export function AdminDashboard({
                 autoComplete="one-time-code"
                 maxLength={6}
                 value={totpCode}
-                onChange={(event) => setTotpCode(event.target.value.replace(/\\D/g, '').slice(0, 6))}
+                onChange={(event) => setTotpCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
                 aria-label="Authenticator setup code"
                 className="w-full rounded-xl border border-[#ddd4c9] dark:border-[#2c2925] bg-transparent px-4 py-3 text-center text-xl tracking-[0.4em] font-mono"
                 placeholder="000000"
