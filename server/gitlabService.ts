@@ -345,7 +345,7 @@ export async function fetchGitLabSnapshot(rawUsername = 'lex_cab23'): Promise<Gi
   ];
   const uniqueProjectIds = Array.from(
     new Set(allRawForLanguages.map((p) => Number(p.id)).filter((id) => Number.isFinite(id) && id > 0))
-  ).slice(0, 30);
+  ).slice(0, 12);
 
   const languagesMap = new Map<number, Record<string, number>>();
   if (uniqueProjectIds.length > 0) {
