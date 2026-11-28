@@ -369,6 +369,22 @@ async function startServer() {
     });
   });
 
+  // Minimal operational health endpoint; never exposes environment secrets.
+  app.get('/api/health', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({
+      status: 'ok',
+      service: 'web-portfolio',
+      uptimeSeconds: Math.floor(process.uptime()),
+      timestamp: new Date().toISOString(),
+      integrations: {
+        firebaseAuthVerifier: adminAuthReady ? 'ready' : 'not-configured',
+        githubCache: cachedSnapshot ? 'available' : 'empty',
+        gitlabCache: cachedGitlabSnapshot ? 'available' : 'empty',
+      },
+    });
+  });
+
   // Serve verified CV PDF with explicit Content-Type, Accept-Ranges, and optional attachment download
   app.get('/api/cv', (req, res) => {
     const candidates = [
