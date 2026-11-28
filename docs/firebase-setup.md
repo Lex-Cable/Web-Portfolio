@@ -8,10 +8,9 @@ In the Firebase console for **Web Portfolio**:
 
 1. Open **Authentication → Sign-in method** and enable **Google**.
 2. Add `localhost` and the production hosting domain under **Authentication → Settings → Authorized domains**.
-3. Upgrade/enable Firebase Authentication with Identity Platform for multi-factor authentication.
-4. Under the Identity Platform multi-factor authentication settings, enable **TOTP (authenticator app)** as a supported second factor.
+3. No Identity Platform upgrade or TOTP configuration is required for this administrator flow.
 
-The Admin Console deliberately remains unavailable until the allowlisted administrator completes TOTP enrollment and then signs in again using the TOTP challenge.
+The Admin Console is restricted to the verified Google account `jaccie.wambui26@gmail.com`. Other Google accounts are signed out and cannot access administrator features.
 
 ## 2. Deploy Firestore rules
 
@@ -24,7 +23,7 @@ npx firebase-tools login
 npx firebase-tools deploy --only firestore:rules
 ```
 
-Review the deployment target before confirming. The rules allow public reads only for designated public portfolio data, validated public contact/analytics submissions, and admin operations only for the verified allowlisted account with a TOTP second-factor claim.
+Review the deployment target before confirming. The rules allow public reads only for designated public portfolio data, validated public contact/analytics submissions, and admin operations only for the verified allowlisted administrator account.
 
 ## 3. Verify the web app
 
@@ -38,7 +37,7 @@ npm run lint
 npm run build
 ```
 
-Then test the public portfolio, Google sign-in, TOTP enrollment, sign-out, and a fresh Google sign-in followed by the six-digit authenticator challenge.
+Then test the public portfolio, Google sign-in with the allowlisted administrator account, sign-out, and rejection of other Google accounts.
 
 ## Important
 
