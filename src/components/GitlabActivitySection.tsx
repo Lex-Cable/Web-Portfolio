@@ -183,7 +183,6 @@ export function GitlabActivitySection({
             <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#161616] dark:text-[#fffdf9] text-balance">
               GitLab Profile, Member Projects & Activity
             </h1>
-        </p>
           </div>
           <div className="flex flex-wrap items-center gap-3 shrink-0">
             {refreshedNotice && (
