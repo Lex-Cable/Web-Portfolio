@@ -289,38 +289,82 @@ export function ApprovalsPanel({ approvals }: { approvals: PendingApproval[] }) 
         </div>
       )}
 
-      {history.length > 0 && (
-        <div className="space-y-3 pt-4 border-t border-[#ddd4c9] dark:border-[#2c2925]">
-          <h3 className="text-sm font-bold text-[#161616] dark:text-[#fffdf9]">
-            Recent Reviewed Decisions
-          </h3>
-          <div className="bg-[#fffdf9] dark:bg-[#191816] border border-[#ddd4c9] dark:border-[#2c2925] rounded-2xl divide-y divide-[#ddd4c9] dark:divide-[#2c2925]">
-            {history.slice(0, 10).map((item) => (
-              <div
-                key={item.id}
-                className="px-4 py-3.5 flex items-center justify-between gap-4 text-xs"
-              >
-                <div>
-                  <p className="font-semibold text-[#161616] dark:text-[#fffdf9]">{item.title}</p>
-                  <p className="text-[#68635d] dark:text-[#b9aea2]">
-                    {item.source} · {item.targetType}
-                    {item.reviewerNote ? ` · Note: ${item.reviewerNote}` : ''}
-                  </p>
-                </div>
-                <span
-                  className={`font-semibold whitespace-nowrap ${
-                    item.status === 'rejected'
-                      ? 'text-red-600 dark:text-red-400'
-                      : 'text-emerald-700 dark:text-emerald-400'
-                  }`}
-                >
-                  {item.status.replace('_', ' ')}
-                </span>
-              </div>
-            ))}
+      <section className="space-y-4 pt-6 border-t border-[#ddd4c9] dark:border-[#2c2925]">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#a87552]">Your decision record</p>
+            <h3 className="text-base font-bold text-[#211b16] dark:text-[#fffdf9] mt-1">Recent Reviewed Decisions</h3>
+            <p className="text-xs text-[#68635d] dark:text-[#b9aea2] mt-1">A clear history of what you approved, edited or declined.</p>
           </div>
+          <span className="rounded-full bg-[#f1e8df] dark:bg-[#30251e] text-[#79563d] dark:text-[#e1b996] px-3 py-1.5 text-[11px] font-semibold">{history.length} decision{history.length === 1 ? '' : 's'} recorded</span>
         </div>
-      )}
+
+        {history.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[#d8c9bb] dark:border-[#39332d] bg-[#fffdf9] dark:bg-[#191816] px-6 py-8 text-center">
+            <div className="mx-auto w-10 h-10 rounded-xl bg-[#f3e9df] dark:bg-[#30251e] flex items-center justify-center text-[#9b6847]"><FileText className="w-4 h-4" /></div>
+            <p className="text-sm font-semibold text-[#302a25] dark:text-[#f0e8df] mt-3">No decisions yet</p>
+            <p className="text-xs text-[#81766c] dark:text-[#b9aea2] mt-1">Once you review an item, its decision and any note you leave will appear here.</p>
+          </div>
+        ) : (
+          <div className="relative space-y-3">
+            {history
+              .slice()
+              .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime())
+              .slice(0, 12)
+              .map((item) => {
+                const rejected = item.status === 'rejected';
+                const edited = item.status === 'edited_approved';
+                const dateValue = item.updatedAt || item.createdAt;
+                const date = dateValue ? new Date(dateValue) : null;
+                const dateLabel = date && !Number.isNaN(date.getTime())
+                  ? date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+                  : 'Date not recorded';
+                const sourceLabel = item.source === 'gemini_ai' ? 'AI suggestion' : item.source === 'github_sync' ? 'GitHub update' : 'Manual draft';
+                const decisionLabel = rejected ? 'Declined' : edited ? 'Approved with edits' : 'Approved';
+                const decisionDescription = rejected
+                  ? 'This suggestion was declined and was not published.'
+                  : edited
+                    ? 'You edited the suggested content and approved the revised version.'
+                    : 'You approved this suggestion for publishing.';
+                return (
+                  <article
+                    key={item.id}
+                    className={`relative overflow-hidden rounded-2xl border bg-[#fffdf9] dark:bg-[#191816] shadow-[0_5px_18px_rgba(50,35,20,0.04)] ${rejected ? 'border-red-200 dark:border-red-950' : 'border-[#dfd3c7] dark:border-[#39332d]'}`}
+                  >
+                    <div className={`absolute inset-y-0 left-0 w-1 ${rejected ? 'bg-red-400' : edited ? 'bg-[#bd8b5e]' : 'bg-emerald-600'}`} />
+                    <div className="p-4 sm:p-5 pl-5 sm:pl-6">
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2 mb-2">
+                            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${rejected ? 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300' : edited ? 'bg-[#f5e8da] text-[#805a3e] dark:bg-[#493021] dark:text-[#f0c49f]' : 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'}`}>
+                              {rejected ? <X className="w-3 h-3" /> : <Check className="w-3 h-3" />}
+                              {decisionLabel}
+                            </span>
+                            <span className="text-[10px] text-[#8b7d70] dark:text-[#b9aea2]">{item.category.replace(/[_-]+/g, ' ')} · {item.targetType}</span>
+                          </div>
+                          <h4 className="text-sm font-bold text-[#211b16] dark:text-[#fffdf9]">{item.title}</h4>
+                          <p className="text-xs leading-relaxed text-[#68635d] dark:text-[#b9aea2] mt-1">{decisionDescription}</p>
+                        </div>
+                        <time className="text-[11px] text-[#8b7d70] dark:text-[#b9aea2] whitespace-nowrap">{dateLabel}</time>
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-[#8b7d70] dark:text-[#b9aea2]">
+                        <span>{sourceLabel}</span>
+                        <span className="w-1 h-1 rounded-full bg-[#c7b6a6]" />
+                        <span>Record: {item.targetId || 'Not specified'}</span>
+                      </div>
+                      {item.reviewerNote && (
+                        <div className="mt-3 rounded-xl bg-[#f7f2ec] dark:bg-[#211d19] border border-[#e9ded3] dark:border-[#39332d] px-3.5 py-3">
+                          <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#9b6847] mb-1">Your review note</p>
+                          <p className="text-xs leading-relaxed text-[#514941] dark:text-[#e1d6ca] whitespace-pre-wrap">{item.reviewerNote}</p>
+                        </div>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
