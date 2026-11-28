@@ -27,15 +27,14 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.email_verified == true;
     }
 
-    // Admin access requires the allowlisted, verified account and a completed TOTP MFA sign-in.
+    // Admin access requires only the allowlisted, verified Google account.
     function isBootstrappedAdminEmail() {
       return isVerifiedUser() &&
-        request.auth.token.email == 'jaccie.wambui26@gmail.com' &&
-        request.auth.token.firebase.sign_in_second_factor == 'totp';
+        request.auth.token.email == 'jaccie.wambui26@gmail.com';
     }
 
     function isAdmin() {
-      // This portfolio has exactly one administrator; no UID registry can bypass the email + MFA gate.
+      // This portfolio has exactly one administrator; no UID registry can bypass the email allowlist.
       return isBootstrappedAdminEmail();
     }
 
