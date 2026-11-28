@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getMultiFactorResolver, multiFactor, signInWithPopup, signOut, TotpMultiFactorGenerator, type MultiFactorError, type MultiFactorResolver, type TotpSecret, type User } from 'firebase/auth';
+import { getMultiFactorResolver, multiFactor, signInWithPopup, signOut, TotpMultiFactorGenerator, reauthenticateWithPopup, type MultiFactorError, type MultiFactorResolver, type TotpSecret, type User } from 'firebase/auth';
 import {
   Bot,
   CheckSquare,
@@ -193,7 +193,8 @@ export function AdminDashboard({
     setMfaBusy(true);
     setAuthError(null);
     try {
-      const session = await multiFactor(user).getSession();
+      await reauthenticateWithPopup(user, googleProvider);
+      const session = await multiFactor(auth.currentUser || user).getSession();
       const secret = await TotpMultiFactorGenerator.generateSecret(session);
       setTotpSecret(secret);
       setTotpCode('');
