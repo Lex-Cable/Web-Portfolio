@@ -294,6 +294,12 @@ service cloud.firestore {
         data.createdAt is timestamp;
     }
 
+    // New administrative modules accept bounded JSON records from the single verified admin.
+    function isValidAdminModuleRecord(data) {
+      return isAdmin() && data.keys().size() <= 40;
+    }
+
+
     // Connection ping path
     match /test/{docId} {
       allow get: if docId == 'connection';
@@ -425,5 +431,103 @@ service cloud.firestore {
       allow update: if false;
       allow delete: if isAdmin() && isValidId(eventId);
     }
+    // Admin-only opportunities
+    match /opportunities/{recordId} {
+      allow get, list: if isAdmin();
+      allow create, update: if isValidId(recordId) && isValidAdminModuleRecord(incoming());
+      allow delete: if isAdmin() && isValidId(recordId);
+    }
+
+    // Admin-only content calendar
+    match /content_calendar/{recordId} {
+      allow get, list: if isAdmin();
+      allow create, update: if isValidId(recordId) && isValidAdminModuleRecord(incoming());
+      allow delete: if isAdmin() && isValidId(recordId);
+    }
+
+    // Admin-only system checks
+    match /system_checks/{recordId} {
+      allow get, list: if isAdmin();
+      allow create, update: if isValidId(recordId) && isValidAdminModuleRecord(incoming());
+      allow delete: if isAdmin() && isValidId(recordId);
+    }
+
+    // Admin-only professional documents
+    match /professional_documents/{recordId} {
+      allow get, list: if isAdmin();
+      allow create, update: if isValidId(recordId) && isValidAdminModuleRecord(incoming());
+      allow delete: if isAdmin() && isValidId(recordId);
+    }
+
+    // Admin-only career goals
+    match /career_goals/{recordId} {
+      allow get, list: if isAdmin();
+      allow create, update: if isValidId(recordId) && isValidAdminModuleRecord(incoming());
+      allow delete: if isAdmin() && isValidId(recordId);
+    }
+
+    // Admin-only project case studies
+    match /project_case_studies/{recordId} {
+      allow get, list: if isAdmin();
+      allow create, update: if isValidId(recordId) && isValidAdminModuleRecord(incoming());
+      allow delete: if isAdmin() && isValidId(recordId);
+    }
+
+    // Admin-only automation workflows
+    match /automation_workflows/{recordId} {
+      allow get, list: if isAdmin();
+      allow create, update: if isValidId(recordId) && isValidAdminModuleRecord(incoming());
+      allow delete: if isAdmin() && isValidId(recordId);
+    }
+
+    // Admin-only seo settings
+    match /seo_settings/{recordId} {
+      allow get, list: if isAdmin();
+      allow create, update: if isValidId(recordId) && isValidAdminModuleRecord(incoming());
+      allow delete: if isAdmin() && isValidId(recordId);
+    }
+
+    // Admin-only testimonials
+    match /testimonials/{recordId} {
+      allow get, list: if isAdmin();
+      allow create, update: if isValidId(recordId) && isValidAdminModuleRecord(incoming());
+      allow delete: if isAdmin() && isValidId(recordId);
+    }
+
+    // Admin-only admin backups
+    match /admin_backups/{recordId} {
+      allow get, list: if isAdmin();
+      allow create, update: if isValidId(recordId) && isValidAdminModuleRecord(incoming());
+      allow delete: if isAdmin() && isValidId(recordId);
+    }
+
+    // Admin-only content versions
+    match /content_versions/{recordId} {
+      allow get, list: if isAdmin();
+      allow create, update: if isValidId(recordId) && isValidAdminModuleRecord(incoming());
+      allow delete: if isAdmin() && isValidId(recordId);
+    }
+
+    // Admin-only accessibility reviews
+    match /accessibility_reviews/{recordId} {
+      allow get, list: if isAdmin();
+      allow create, update: if isValidId(recordId) && isValidAdminModuleRecord(incoming());
+      allow delete: if isAdmin() && isValidId(recordId);
+    }
+
+    // Admin-only newsletter subscribers
+    match /newsletter_subscribers/{recordId} {
+      allow get, list: if isAdmin();
+      allow create, update: if isValidId(recordId) && isValidAdminModuleRecord(incoming());
+      allow delete: if isAdmin() && isValidId(recordId);
+    }
+
+    // Admin-only privacy settings
+    match /privacy_settings/{recordId} {
+      allow get, list: if isAdmin();
+      allow create, update: if isValidId(recordId) && isValidAdminModuleRecord(incoming());
+      allow delete: if isAdmin() && isValidId(recordId);
+    }
+
   }
 }

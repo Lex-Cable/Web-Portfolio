@@ -36,6 +36,7 @@ import {
   saveGithubSettings,
 } from '../services/portfolioDb';
 import { extractApiError, safeParseJsonResponse } from '../utils/safeFetchJson';
+import { AdminExpansionPanel } from './AdminExpansionPanel';
 import {
   ApprovalsPanel,
   CvManagerPanel,
@@ -75,7 +76,8 @@ type AdminTab =
   | 'profile'
   | 'cv'
   | 'inbox'
-  | 'setup';
+  | 'setup'
+  | 'workspace';
 
 export function AdminDashboard({
   user,
@@ -490,6 +492,7 @@ export function AdminDashboard({
     { id: 'cv', label: 'CV Manager', icon: <FileText className="w-4 h-4" /> },
     { id: 'inbox', label: 'Inbox & Analytics', icon: <Inbox className="w-4 h-4" /> },
     { id: 'setup', label: 'Deployment Guide', icon: <Server className="w-4 h-4" /> },
+    { id: 'workspace', label: 'Admin Workspace', icon: <Layers className="w-4 h-4" /> },
   ];
 
   return (
@@ -865,6 +868,8 @@ export function AdminDashboard({
               auditLogs={auditLogs}
             />
           )}
+
+          {activeTab === 'workspace' && <AdminExpansionPanel />}
 
           {activeTab === 'setup' && (
             <div className="bg-[#fffdf9] dark:bg-[#191816] border border-[#ddd4c9] dark:border-[#2c2925] rounded-2xl p-6 space-y-4 text-xs leading-relaxed text-[#68635d] dark:text-[#b9aea2]">

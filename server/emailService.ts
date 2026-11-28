@@ -64,3 +64,37 @@ export async function sendContactEmail(params: {
     note: 'Message forwarded to Jacinta Wambui Waweru.',
   };
 }
+
+
+export async function sendContactReply(params: {
+  senderName: string;
+  senderEmail: string;
+  subject: string;
+  reply: string;
+}): Promise<void> {
+  const host = process.env.SMTP_HOST;
+  const port = Number(process.env.SMTP_PORT || 587);
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const adminEmail = process.env.ADMIN_EMAIL || 'jaccie.wambui26@gmail.com';
+  const fromAddress = process.env.SMTP_FROM || user || adminEmail;
+
+  if (!host || !user || !pass) {
+    throw new Error('Email replies are not available yet. Configure SMTP_HOST, SMTP_USER, and SMTP_PASS on the server.');
+  }
+
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+  });
+
+  await transporter.sendMail({
+    from: `"Jacinta Wambui Waweru" <${fromAddress}>`,
+    to: params.senderEmail,
+    replyTo: adminEmail,
+    subject: params.subject.startsWith('Re:') ? params.subject : `Re: ${params.subject}`,
+    text: `Hello ${params.senderName},\n\n${params.reply.trim()}\n\nBest regards,\nJacinta Wambui Waweru\nFull-Stack Developer`,
+  });
+}

@@ -10,7 +10,7 @@ import { createServer as createViteServer } from 'vite';
 import { fetchGitHubSnapshot, fetchRepositoryFullDetails } from './server/githubService.ts';
 import { fetchGitLabSnapshot } from './server/gitlabService.ts';
 import { analyzeRepositoryWithGemini, generatePortfolioAdvisory } from './server/geminiService.ts';
-import { sendContactEmail } from './server/emailService.ts';
+import { sendContactEmail, sendContactReply } from './server/emailService.ts';
 import type { GithubRepoSummary, GithubSnapshot, GitlabSnapshot, Project } from './src/types/portfolio.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -132,6 +132,41 @@ function persistGitlabSnapshotToCache(snapshot: GitlabSnapshot) {
   } catch {
     // Non-fatal in read-only filesystems
   }
+}
+
+let gitlabRefreshPromise: Promise<GitlabSnapshot> | null = null;
+let gitlabRateLimitedUntilMs = 0;
+
+async function refreshGitlabSnapshot(forceRefresh = false): Promise<GitlabSnapshot> {
+  const cacheTtlMs = 30 * 60 * 1000;
+  const cacheIsFresh = Boolean(cachedGitlabSnapshot && Date.now() - cachedGitlabAtMs < cacheTtlMs);
+
+  if (!forceRefresh && cacheIsFresh && cachedGitlabSnapshot) return cachedGitlabSnapshot;
+  if (Date.now() < gitlabRateLimitedUntilMs && cachedGitlabSnapshot) return cachedGitlabSnapshot;
+
+  if (!gitlabRefreshPromise) {
+    gitlabRefreshPromise = fetchGitLabSnapshot(GITLAB_USERNAME)
+      .then((fresh) => {
+        const merged = mergeGitlabSnapshot(cachedGitlabSnapshot, fresh);
+        persistGitlabSnapshotToCache(merged);
+        gitlabRateLimitedUntilMs = 0;
+        return merged;
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        if (/rate limit|429/i.test(message)) {
+          // Honor a conservative cooldown so repeated page visits do not amplify 429s.
+          gitlabRateLimitedUntilMs = Date.now() + 15 * 60 * 1000;
+        }
+        if (cachedGitlabSnapshot) return cachedGitlabSnapshot;
+        throw error;
+      })
+      .finally(() => {
+        gitlabRefreshPromise = null;
+      });
+  }
+
+  return gitlabRefreshPromise;
 }
 
 function mergeGithubSnapshot(
@@ -334,6 +369,22 @@ async function startServer() {
     });
   });
 
+  // Minimal operational health endpoint; never exposes environment secrets.
+  app.get('/api/health', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({
+      status: 'ok',
+      service: 'web-portfolio',
+      uptimeSeconds: Math.floor(process.uptime()),
+      timestamp: new Date().toISOString(),
+      integrations: {
+        firebaseAuthVerifier: adminAuthReady ? 'ready' : 'not-configured',
+        githubCache: cachedSnapshot ? 'available' : 'empty',
+        gitlabCache: cachedGitlabSnapshot ? 'available' : 'empty',
+      },
+    });
+  });
+
   // Serve verified CV PDF with explicit Content-Type, Accept-Ranges, and optional attachment download
   app.get('/api/cv', (req, res) => {
     const candidates = [
@@ -406,29 +457,14 @@ async function startServer() {
     }
   });
 
-  // Public GitLab Snapshot (caches for 30 minutes unless ?refresh=1)
+  // Public GitLab Snapshot (30-minute cache, single-flight refresh, and stale-cache fallback)
   app.get('/api/gitlab/snapshot', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     const forceRefresh = req.query.refresh === '1';
     try {
-      const cacheTtlMs = 30 * 60 * 1000;
-      const missingRichData = !cachedGitlabSnapshot?.avatarUrl && !cachedGitlabSnapshot?.lastActivityAtomAt;
-      if (
-        forceRefresh ||
-        !cachedGitlabSnapshot ||
-        missingRichData ||
-        Date.now() - cachedGitlabAtMs > cacheTtlMs
-      ) {
-        const fresh = await fetchGitLabSnapshot(GITLAB_USERNAME);
-        const merged = mergeGitlabSnapshot(cachedGitlabSnapshot, fresh);
-        persistGitlabSnapshotToCache(merged);
-      }
-      res.json(cachedGitlabSnapshot);
+      const snapshot = await refreshGitlabSnapshot(forceRefresh);
+      res.json(snapshot);
     } catch (err) {
-      if (!forceRefresh && cachedGitlabSnapshot) {
-        res.json(cachedGitlabSnapshot);
-        return;
-      }
       res.status(502).json({
         error: err instanceof Error ? err.message : 'Unable to fetch GitLab profile.',
       });
@@ -459,11 +495,9 @@ async function startServer() {
 
       let gitlabSnapshot: GitlabSnapshot | null = cachedGitlabSnapshot;
       try {
-        const freshGitlab = await fetchGitLabSnapshot(GITLAB_USERNAME);
-        gitlabSnapshot = mergeGitlabSnapshot(cachedGitlabSnapshot, freshGitlab);
-        persistGitlabSnapshotToCache(gitlabSnapshot);
+        gitlabSnapshot = await refreshGitlabSnapshot(false);
       } catch {
-        // Keep existing cached GitLab snapshot if GitLab upstream rate-limits
+        // GitLab is optional for a successful GitHub sync; preserve any cached snapshot.
       }
 
       const projectByRepo = new Map<string, Project>();
@@ -732,6 +766,35 @@ async function startServer() {
       res.status(500).json({
         error: err instanceof Error ? err.message : 'Unable to process contact submission.',
       });
+    }
+  });
+
+  // Send a direct reply to a contact form message (administrator only).
+  app.post('/api/admin/contact-reply', adminApiLimiter, requireAdmin, async (req: AuthedRequest, res) => {
+    try {
+      const { senderName, senderEmail, subject, reply } = (req.body || {}) as {
+        senderName?: string;
+        senderEmail?: string;
+        subject?: string;
+        reply?: string;
+      };
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!senderName || senderName.trim().length < 2 || senderName.length > 120 ||
+          !senderEmail || !emailRegex.test(senderEmail) || senderEmail.length > 160 ||
+          !subject || subject.trim().length < 2 || subject.length > 200 ||
+          !reply || reply.trim().length < 2 || reply.length > 5000) {
+        res.status(400).json({ error: 'Please check the recipient, subject, and reply. The reply must contain 2–5,000 characters.' });
+        return;
+      }
+      await sendContactReply({
+        senderName: senderName.trim(),
+        senderEmail: senderEmail.trim(),
+        subject: subject.trim(),
+        reply: reply.trim(),
+      });
+      res.json({ ok: true, message: 'Reply sent successfully.' });
+    } catch (err) {
+      res.status(502).json({ error: err instanceof Error ? err.message : 'Unable to send the reply.' });
     }
   });
 

@@ -11,7 +11,11 @@ import {
   AlertTriangle,
   Download,
   Eye,
+  Mail,
+  Send,
+  Activity,
 } from 'lucide-react';
+import { auth } from '../lib/firebase';
 import type {
   AnalyticsEvent,
   AuditLog,
@@ -65,6 +69,43 @@ const PROFICIENCY_LEVELS: SkillProficiency[] = [
   'Currently Learning',
 ];
 
+
+function ApprovalContentPreview({ json, emptyLabel }: { json: string; emptyLabel: string }) {
+  let data: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(json || '{}') as unknown;
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) data = parsed as Record<string, unknown>;
+    else data = { content: parsed };
+  } catch {
+    return <pre className="text-xs whitespace-pre-wrap break-words text-[#514941] dark:text-[#d5cdc3]">{json}</pre>;
+  }
+  const entries = Object.entries(data).filter(([key]) => !['id', 'createdAt', 'updatedAt'].includes(key));
+  if (!entries.length) return <p className="text-xs text-[#8a8178] dark:text-[#b9aea2]">{emptyLabel}</p>;
+  const humanize = (key: string) => key.replace(/([A-Z])/g, ' $1').replace(/[_-]+/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
+  const display = (value: unknown) => {
+    if (value === null || value === undefined || value === '') return 'Not provided';
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+    if (Array.isArray(value)) return value.length ? value.join(' · ') : 'None';
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+  };
+  return (
+    <div className="grid sm:grid-cols-2 gap-2">
+      {entries.slice(0, 12).map(([key, value]) => (
+        <div key={key} className="rounded-xl bg-white/70 dark:bg-[#111110]/70 border border-[#e7ddd2] dark:border-[#39332d] px-3 py-2.5">
+          <p className="text-[10px] uppercase tracking-wide font-semibold text-[#9b806b]">{humanize(key)}</p>
+          <p className="text-xs leading-relaxed text-[#302a25] dark:text-[#f0e8df] mt-1 break-words">{display(value)}</p>
+        </div>
+      ))}
+      {entries.length > 12 && <p className="sm:col-span-2 text-[11px] text-[#8a8178]">And {entries.length - 12} more fields.</p>}
+      <details className="sm:col-span-2">
+        <summary className="cursor-pointer text-[11px] font-semibold text-[#9b6847]">View raw details</summary>
+        <pre className="mt-2 text-[11px] font-mono-tabular bg-[#f7f3ed] dark:bg-[#111110] border border-[#ddd4c9] dark:border-[#2c2925] rounded-xl p-3 overflow-x-auto max-h-56">{JSON.stringify(data, null, 2)}</pre>
+      </details>
+    </div>
+  );
+}
+
 export function ApprovalsPanel({ approvals }: { approvals: PendingApproval[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editedJson, setEditedJson] = useState('');
@@ -110,7 +151,7 @@ export function ApprovalsPanel({ approvals }: { approvals: PendingApproval[] }) 
           Pending Approvals ({pending.length})
         </h2>
         <p className="text-xs text-[#68635d] dark:text-[#b9aea2] mt-1">
-          No GitHub detection or AI draft becomes public until you explicitly approve it.
+          Nothing is published automatically. Review the suggested change, then approve, edit, or decline it.
         </p>
       </div>
 
@@ -133,38 +174,34 @@ export function ApprovalsPanel({ approvals }: { approvals: PendingApproval[] }) 
             return (
               <div
                 key={item.id}
-                className="bg-[#fffdf9] dark:bg-[#191816] border border-[#ddd4c9] dark:border-[#2c2925] rounded-2xl p-6 space-y-4"
+                className="relative overflow-hidden bg-gradient-to-br from-[#fffdf9] via-[#fffdf9] to-[#f4e7dc] dark:from-[#191816] dark:via-[#191816] dark:to-[#30231b] border border-[#cfa385] dark:border-[#76543e] rounded-2xl p-6 space-y-5 shadow-[0_12px_35px_rgba(128,83,48,0.08)]"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-xs text-[#b98b6e] font-semibold tracking-wide uppercase">
-                      {item.source} · {item.category} · {item.targetType}
+                      {item.source === 'gemini_ai' ? 'AI suggestion' : item.source === 'github_sync' ? 'GitHub update' : 'Manual draft'} · {item.category.replace(/[_-]+/g, ' ')} · {item.targetType}
                     </p>
                     <h3 className="text-base font-bold text-[#161616] dark:text-[#fffdf9] mt-0.5">
                       {item.title}
                     </h3>
                   </div>
                   <span className="text-xs font-mono-tabular text-[#b98b6e] font-semibold">
-                    Pending Review
+                    Needs your review
                   </span>
                 </div>
 
-                <p className="text-sm text-[#68635d] dark:text-[#b9aea2]">
-                  {item.explanation}
-                </p>
+                <div className="rounded-xl border border-[#e4cdb9] dark:border-[#654832] bg-white/70 dark:bg-[#171310]/70 p-4"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9b6847] mb-1">Why this is waiting</p><p className="text-sm leading-relaxed text-[#514941] dark:text-[#e1d6ca]">{item.explanation}</p></div>
 
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <p className="text-xs font-semibold text-[#68635d] dark:text-[#b9aea2]">
-                      Previous Content
+                      What is there now
                     </p>
-                    <pre className="text-[11px] font-mono-tabular bg-[#f7f3ed] dark:bg-[#111110] border border-[#ddd4c9] dark:border-[#2c2925] rounded-xl p-3.5 overflow-x-auto max-h-56 text-[#161616] dark:text-[#f7f3ed]">
-                      {item.previousContentJson || '{}'}
-                    </pre>
+                    <ApprovalContentPreview json={item.previousContentJson} emptyLabel="No previous version — this is a new item." />
                   </div>
                   <div className="space-y-1.5">
                     <p className="text-xs font-semibold text-[#68635d] dark:text-[#b9aea2]">
-                      Proposed Content
+                      What will change
                     </p>
                     {isEditing ? (
                       <textarea
@@ -174,9 +211,7 @@ export function ApprovalsPanel({ approvals }: { approvals: PendingApproval[] }) 
                         className="w-full text-[11px] font-mono-tabular bg-[#f7f3ed] dark:bg-[#111110] border border-[#b98b6e] rounded-xl p-3.5 text-[#161616] dark:text-[#f7f3ed] focus:outline-none"
                       />
                     ) : (
-                      <pre className="text-[11px] font-mono-tabular bg-[#f7f3ed] dark:bg-[#111110] border border-[#ddd4c9] dark:border-[#2c2925] rounded-xl p-3.5 overflow-x-auto max-h-56 text-[#161616] dark:text-[#f7f3ed]">
-                        {item.proposedContentJson}
-                      </pre>
+                      <ApprovalContentPreview json={item.proposedContentJson} emptyLabel="No proposed details were supplied." />
                     )}
                   </div>
                 </div>
@@ -224,7 +259,7 @@ export function ApprovalsPanel({ approvals }: { approvals: PendingApproval[] }) 
                           className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-full border border-[#ddd4c9] dark:border-[#2c2925] text-[#161616] dark:text-[#fffdf9] hover:bg-[#f4f0e9] dark:hover:bg-[#24211e]"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
-                          <span>Edit Before Approval</span>
+                          <span>Review & Edit</span>
                         </button>
                         <button
                           type="button"
@@ -254,38 +289,82 @@ export function ApprovalsPanel({ approvals }: { approvals: PendingApproval[] }) 
         </div>
       )}
 
-      {history.length > 0 && (
-        <div className="space-y-3 pt-4 border-t border-[#ddd4c9] dark:border-[#2c2925]">
-          <h3 className="text-sm font-bold text-[#161616] dark:text-[#fffdf9]">
-            Recent Reviewed Decisions
-          </h3>
-          <div className="bg-[#fffdf9] dark:bg-[#191816] border border-[#ddd4c9] dark:border-[#2c2925] rounded-2xl divide-y divide-[#ddd4c9] dark:divide-[#2c2925]">
-            {history.slice(0, 10).map((item) => (
-              <div
-                key={item.id}
-                className="px-4 py-3.5 flex items-center justify-between gap-4 text-xs"
-              >
-                <div>
-                  <p className="font-semibold text-[#161616] dark:text-[#fffdf9]">{item.title}</p>
-                  <p className="text-[#68635d] dark:text-[#b9aea2]">
-                    {item.source} · {item.targetType}
-                    {item.reviewerNote ? ` · Note: ${item.reviewerNote}` : ''}
-                  </p>
-                </div>
-                <span
-                  className={`font-semibold whitespace-nowrap ${
-                    item.status === 'rejected'
-                      ? 'text-red-600 dark:text-red-400'
-                      : 'text-emerald-700 dark:text-emerald-400'
-                  }`}
-                >
-                  {item.status.replace('_', ' ')}
-                </span>
-              </div>
-            ))}
+      <section className="space-y-4 pt-6 border-t border-[#ddd4c9] dark:border-[#2c2925]">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#a87552]">Your decision record</p>
+            <h3 className="text-base font-bold text-[#211b16] dark:text-[#fffdf9] mt-1">Recent Reviewed Decisions</h3>
+            <p className="text-xs text-[#68635d] dark:text-[#b9aea2] mt-1">A clear history of what you approved, edited or declined.</p>
           </div>
+          <span className="rounded-full bg-[#f1e8df] dark:bg-[#30251e] text-[#79563d] dark:text-[#e1b996] px-3 py-1.5 text-[11px] font-semibold">{history.length} decision{history.length === 1 ? '' : 's'} recorded</span>
         </div>
-      )}
+
+        {history.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[#d8c9bb] dark:border-[#39332d] bg-[#fffdf9] dark:bg-[#191816] px-6 py-8 text-center">
+            <div className="mx-auto w-10 h-10 rounded-xl bg-[#f3e9df] dark:bg-[#30251e] flex items-center justify-center text-[#9b6847]"><FileText className="w-4 h-4" /></div>
+            <p className="text-sm font-semibold text-[#302a25] dark:text-[#f0e8df] mt-3">No decisions yet</p>
+            <p className="text-xs text-[#81766c] dark:text-[#b9aea2] mt-1">Once you review an item, its decision and any note you leave will appear here.</p>
+          </div>
+        ) : (
+          <div className="relative space-y-3">
+            {history
+              .slice()
+              .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime())
+              .slice(0, 12)
+              .map((item) => {
+                const rejected = item.status === 'rejected';
+                const edited = item.status === 'edited_approved';
+                const dateValue = item.updatedAt || item.createdAt;
+                const date = dateValue ? new Date(dateValue) : null;
+                const dateLabel = date && !Number.isNaN(date.getTime())
+                  ? date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+                  : 'Date not recorded';
+                const sourceLabel = item.source === 'gemini_ai' ? 'AI suggestion' : item.source === 'github_sync' ? 'GitHub update' : 'Manual draft';
+                const decisionLabel = rejected ? 'Declined' : edited ? 'Approved with edits' : 'Approved';
+                const decisionDescription = rejected
+                  ? 'This suggestion was declined and was not published.'
+                  : edited
+                    ? 'You edited the suggested content and approved the revised version.'
+                    : 'You approved this suggestion for publishing.';
+                return (
+                  <article
+                    key={item.id}
+                    className={`relative overflow-hidden rounded-2xl border bg-[#fffdf9] dark:bg-[#191816] shadow-[0_5px_18px_rgba(50,35,20,0.04)] ${rejected ? 'border-red-200 dark:border-red-950' : 'border-[#dfd3c7] dark:border-[#39332d]'}`}
+                  >
+                    <div className={`absolute inset-y-0 left-0 w-1 ${rejected ? 'bg-red-400' : edited ? 'bg-[#bd8b5e]' : 'bg-emerald-600'}`} />
+                    <div className="p-4 sm:p-5 pl-5 sm:pl-6">
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2 mb-2">
+                            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${rejected ? 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300' : edited ? 'bg-[#f5e8da] text-[#805a3e] dark:bg-[#493021] dark:text-[#f0c49f]' : 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'}`}>
+                              {rejected ? <X className="w-3 h-3" /> : <Check className="w-3 h-3" />}
+                              {decisionLabel}
+                            </span>
+                            <span className="text-[10px] text-[#8b7d70] dark:text-[#b9aea2]">{item.category.replace(/[_-]+/g, ' ')} · {item.targetType}</span>
+                          </div>
+                          <h4 className="text-sm font-bold text-[#211b16] dark:text-[#fffdf9]">{item.title}</h4>
+                          <p className="text-xs leading-relaxed text-[#68635d] dark:text-[#b9aea2] mt-1">{decisionDescription}</p>
+                        </div>
+                        <time className="text-[11px] text-[#8b7d70] dark:text-[#b9aea2] whitespace-nowrap">{dateLabel}</time>
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-[#8b7d70] dark:text-[#b9aea2]">
+                        <span>{sourceLabel}</span>
+                        <span className="w-1 h-1 rounded-full bg-[#c7b6a6]" />
+                        <span>Record: {item.targetId || 'Not specified'}</span>
+                      </div>
+                      {item.reviewerNote && (
+                        <div className="mt-3 rounded-xl bg-[#f7f2ec] dark:bg-[#211d19] border border-[#e9ded3] dark:border-[#39332d] px-3.5 py-3">
+                          <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#9b6847] mb-1">Your review note</p>
+                          <p className="text-xs leading-relaxed text-[#514941] dark:text-[#e1d6ca] whitespace-pre-wrap">{item.reviewerNote}</p>
+                        </div>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
@@ -1177,135 +1256,212 @@ export function InboxAnalyticsAuditPanel({
   analytics: AnalyticsEvent[];
   auditLogs: AuditLog[];
 }) {
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+  const [replyingId, setReplyingId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [replyBusyId, setReplyBusyId] = useState<string | null>(null);
+  const [replyErrors, setReplyErrors] = useState<Record<string, string>>({});
+  const [replySuccess, setReplySuccess] = useState<Record<string, string>>({});
+
   const pageViews = analytics.filter((e) => e.eventType === 'page_view').length;
   const cvDownloads = analytics.filter((e) => e.eventType === 'cv_download').length;
   const contactSubmits = analytics.filter((e) => e.eventType === 'contact_submit').length;
-
+  const unreadCount = messages.filter((m) => m.status === 'unread').length;
   const projectViews = new Map<string, number>();
-  const referrers = new Map<string, number>();
   for (const evt of analytics) {
     if (evt.eventType === 'project_view') {
       projectViews.set(evt.targetSlug, (projectViews.get(evt.targetSlug) || 0) + 1);
     }
-    const ref = evt.referrer || 'direct';
-    referrers.set(ref, (referrers.get(ref) || 0) + 1);
   }
+
+  const sendReply = async (message: ContactMessage) => {
+    const reply = (replyDrafts[message.id] || '').trim();
+    if (reply.length < 2) {
+      setReplyErrors((prev) => ({ ...prev, [message.id]: 'Write a reply before sending.' }));
+      return;
+    }
+    setReplyBusyId(message.id);
+    setReplyErrors((prev) => ({ ...prev, [message.id]: '' }));
+    setReplySuccess((prev) => ({ ...prev, [message.id]: '' }));
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) throw new Error('Your admin session has expired. Please sign in again.');
+      const token = await currentUser.getIdToken();
+      const response = await fetch('/api/admin/contact-reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          senderName: message.senderName,
+          senderEmail: message.senderEmail,
+          subject: message.subject,
+          reply,
+        }),
+      });
+      const payload = await response.json().catch(() => ({})) as { error?: string; message?: string };
+      if (!response.ok) throw new Error(payload.error || 'The reply could not be sent.');
+      await updateContactMessageStatus(message.id, 'replied');
+      setReplyDrafts((prev) => ({ ...prev, [message.id]: '' }));
+      setReplySuccess((prev) => ({ ...prev, [message.id]: 'Reply sent. This conversation is marked as replied.' }));
+      setReplyingId(null);
+    } catch (err) {
+      setReplyErrors((prev) => ({ ...prev, [message.id]: err instanceof Error ? err.message : 'Unable to send reply.' }));
+    } finally {
+      setReplyBusyId(null);
+    }
+  };
+
+  const readableAction = (value: string) => value.replace(/[_-]+/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+  const readableDate = (value?: string) => {
+    if (!value) return 'Time not recorded';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? 'Time not recorded' : date.toLocaleString();
+  };
 
   return (
     <div className="space-y-10">
-      {/* Private Analytics */}
       <section className="space-y-4">
-        <div>
-          <h2 className="text-base font-bold text-[#161616] dark:text-[#fffdf9]">
-            Private Portfolio Analytics
-          </h2>
-          <p className="text-xs text-[#68635d] dark:text-[#b9aea2]">
-            Real recorded telemetry events stored privately in Firestore (no fabricated numbers).
-          </p>
+        <div className="flex items-end justify-between gap-3 flex-wrap">
+          <div>
+            <p className="text-[11px] font-semibold tracking-[0.16em] uppercase text-[#b98b6e]">Your audience at a glance</p>
+            <h2 className="text-xl font-bold text-[#161616] dark:text-[#fffdf9] mt-1">Portfolio analytics</h2>
+            <p className="text-xs text-[#68635d] dark:text-[#b9aea2] mt-1">Counts from recorded portfolio events.</p>
+          </div>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="bg-[#fffdf9] dark:bg-[#191816] border border-[#ddd4c9] dark:border-[#2c2925] rounded-2xl p-4">
-            <p className="text-xs text-[#68635d] dark:text-[#b9aea2]">Page Views</p>
-            <p className="text-xl font-bold font-mono-tabular mt-1 text-[#161616] dark:text-[#fffdf9]">{pageViews}</p>
-          </div>
-          <div className="bg-[#fffdf9] dark:bg-[#191816] border border-[#ddd4c9] dark:border-[#2c2925] rounded-2xl p-4">
-            <p className="text-xs text-[#68635d] dark:text-[#b9aea2]">Project Views</p>
-            <p className="text-xl font-bold font-mono-tabular mt-1 text-[#161616] dark:text-[#fffdf9]">
-              {Array.from(projectViews.values()).reduce((a, b) => a + b, 0)}
-            </p>
-          </div>
-          <div className="bg-[#fffdf9] dark:bg-[#191816] border border-[#ddd4c9] dark:border-[#2c2925] rounded-2xl p-4">
-            <p className="text-xs text-[#68635d] dark:text-[#b9aea2]">CV Downloads</p>
-            <p className="text-xl font-bold font-mono-tabular mt-1 text-[#161616] dark:text-[#fffdf9]">{cvDownloads}</p>
-          </div>
-          <div className="bg-[#fffdf9] dark:bg-[#191816] border border-[#ddd4c9] dark:border-[#2c2925] rounded-2xl p-4">
-            <p className="text-xs text-[#68635d] dark:text-[#b9aea2]">Contact Submissions</p>
-            <p className="text-xl font-bold font-mono-tabular mt-1 text-[#161616] dark:text-[#fffdf9]">{contactSubmits}</p>
-          </div>
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+          {[
+            { label: 'Page views', value: pageViews, note: 'Portfolio visits' },
+            { label: 'Project views', value: Array.from(projectViews.values()).reduce((a, b) => a + b, 0), note: 'Project detail views' },
+            { label: 'CV downloads', value: cvDownloads, note: 'Document downloads' },
+            { label: 'Contact enquiries', value: contactSubmits, note: 'Form submissions' },
+          ].map((metric) => (
+            <div key={metric.label} className="relative overflow-hidden rounded-2xl border border-[#ddd4c9] dark:border-[#39332d] bg-gradient-to-br from-[#fffdf9] to-[#f3e9df] dark:from-[#211d19] dark:to-[#30241d] p-4">
+              <p className="text-xs font-medium text-[#68635d] dark:text-[#c9b9aa]">{metric.label}</p>
+              <p className="text-3xl font-bold tracking-tight text-[#241b15] dark:text-[#fffdf9] mt-2">{metric.value.toLocaleString()}</p>
+              <p className="text-[11px] text-[#8a7565] dark:text-[#b9aea2] mt-1">{metric.note}</p>
+            </div>
+          ))}
         </div>
         {projectViews.size > 0 && (
-          <div className="bg-[#fffdf9] dark:bg-[#191816] border border-[#ddd4c9] dark:border-[#2c2925] rounded-2xl p-4 text-xs space-y-1">
-            <p className="font-bold text-[#161616] dark:text-[#fffdf9] mb-2">Most Viewed Projects</p>
-            {Array.from(projectViews.entries())
-              .sort((a, b) => b[1] - a[1])
-              .map(([slug, count]) => (
-                <div key={slug} className="flex justify-between py-1">
-                  <span>{slug}</span>
-                  <span className="font-mono-tabular">{count}</span>
-                </div>
-              ))}
+          <div className="rounded-2xl border border-[#ddd4c9] dark:border-[#2c2925] bg-[#fffdf9] dark:bg-[#191816] p-5 space-y-3">
+            <h3 className="text-sm font-bold text-[#161616] dark:text-[#fffdf9]">Most viewed projects</h3>
+            {Array.from(projectViews.entries()).sort((a, b) => b[1] - a[1]).map(([slug, count]) => (
+              <div key={slug} className="flex items-center gap-3 text-xs">
+                <span className="flex-1 text-[#4b4742] dark:text-[#d5cdc3]">{readableAction(slug)}</span>
+                <div className="w-28 h-1.5 rounded-full bg-[#eee8df] dark:bg-[#302a25] overflow-hidden"><div className="h-full rounded-full bg-[#b98b6e]" style={{ width: `${Math.min(100, count / Math.max(1, ...projectViews.values()) * 100)}%` }} /></div>
+                <span className="w-8 text-right font-semibold tabular-nums">{count}</span>
+              </div>
+            ))}
           </div>
         )}
       </section>
 
-      {/* Contact Messages Inbox */}
       <section className="space-y-4">
-        <h2 className="text-base font-bold text-[#161616] dark:text-[#fffdf9]">
-          Contact Form Inbox ({messages.length})
-        </h2>
-        <div className="bg-[#fffdf9] dark:bg-[#191816] border border-[#ddd4c9] dark:border-[#2c2925] rounded-2xl divide-y divide-[#ddd4c9] dark:divide-[#2c2925]">
+        <div className="flex items-end justify-between gap-3 flex-wrap">
+          <div>
+            <p className="text-[11px] font-semibold tracking-[0.16em] uppercase text-[#b98b6e]">Messages from your contact page</p>
+            <h2 className="text-xl font-bold text-[#161616] dark:text-[#fffdf9] mt-1">Your inbox</h2>
+            <p className="text-xs text-[#68635d] dark:text-[#b9aea2] mt-1">Open a message to read it and reply without leaving the dashboard.</p>
+          </div>
+          <div className="rounded-full px-3.5 py-2 text-xs font-semibold bg-[#f4e4d7] text-[#754b31] dark:bg-[#493021] dark:text-[#f2c9a9]">
+            {unreadCount} unread · {messages.length} total
+          </div>
+        </div>
+        <div className="space-y-3">
           {messages.length === 0 ? (
-            <p className="p-6 text-xs text-[#68635d] dark:text-[#b9aea2]">
-              No messages submitted yet.
-            </p>
-          ) : (
-            messages.map((m) => (
-              <div key={m.id} className="p-4 space-y-2 text-xs">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <span className="font-bold text-[#161616] dark:text-[#fffdf9]">
-                      {m.subject}
-                    </span>{' '}
-                    <span className="text-[#68635d] dark:text-[#b9aea2]">
-                      — {m.senderName} ({m.senderEmail})
-                    </span>
+            <div className="rounded-2xl border border-dashed border-[#cfc3b7] dark:border-[#39332d] bg-[#fffdf9] dark:bg-[#191816] p-10 text-center">
+              <div className="mx-auto w-12 h-12 rounded-2xl bg-[#f4e4d7] dark:bg-[#493021] flex items-center justify-center text-[#9b6847]"><Mail className="w-5 h-5" /></div>
+              <p className="font-semibold text-sm text-[#161616] dark:text-[#fffdf9] mt-3">Your inbox is clear</p>
+              <p className="text-xs text-[#68635d] dark:text-[#b9aea2] mt-1">New contact form enquiries will appear here.</p>
+            </div>
+          ) : messages.map((m) => {
+            const expanded = expandedId === m.id;
+            const isReplying = replyingId === m.id;
+            return (
+              <article key={m.id} className={`rounded-2xl border overflow-hidden transition-colors ${m.status === 'unread' ? 'border-[#c89570] dark:border-[#a87654] bg-[#fffaf5] dark:bg-[#241b16] shadow-[0_8px_28px_rgba(128,83,48,0.09)]' : 'border-[#ddd4c9] dark:border-[#39332d] bg-[#fffdf9] dark:bg-[#191816]'}`}>
+                <button type="button" onClick={() => { setExpandedId(expanded ? null : m.id); if (!expanded && m.status === 'unread') void updateContactMessageStatus(m.id, 'read'); }} className="w-full text-left p-4 sm:p-5 flex items-start gap-3">
+                  <div className={`mt-0.5 w-10 h-10 shrink-0 rounded-xl flex items-center justify-center ${m.status === 'unread' ? 'bg-[#f0d9c6] text-[#754b31] dark:bg-[#493021] dark:text-[#f2c9a9]' : 'bg-[#f1ece5] text-[#75695f] dark:bg-[#302a25] dark:text-[#c9b9aa]'}`}>
+                    <Mail className="w-4 h-4" />
                   </div>
-                  <select
-                    value={m.status}
-                    onChange={(e) =>
-                      void updateContactMessageStatus(
-                        m.id,
-                        e.target.value as ContactMessage['status']
-                      )
-                    }
-                    className="px-2.5 py-1 rounded-xl border border-[#ddd4c9] dark:border-[#2c2925] bg-[#f7f3ed] dark:bg-[#111110]"
-                  >
-                    <option value="unread">unread</option>
-                    <option value="read">read</option>
-                    <option value="replied">replied</option>
-                    <option value="archived">archived</option>
-                  </select>
-                </div>
-                <p className="text-[#161616] dark:text-[#f7f3ed] whitespace-pre-line">{m.message}</p>
-                <p className="text-[11px] font-mono-tabular text-[#68635d] dark:text-[#b9aea2]">
-                  {m.createdAt ? new Date(m.createdAt).toLocaleString() : 'Just now'} ·{' '}
-                  {m.emailDelivered ? 'Forwarded via SMTP' : 'Stored in Firestore Inbox'}
-                </p>
-              </div>
-            ))
-          )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-bold text-sm text-[#161616] dark:text-[#fffdf9]">{m.senderName}</span>
+                      {m.status === 'unread' && <span className="w-2 h-2 rounded-full bg-[#c16f3d]" />}
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${m.status === 'unread' ? 'bg-[#f0d9c6] text-[#754b31]' : m.status === 'replied' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-[#eee8df] text-[#6b625a] dark:bg-[#302a25] dark:text-[#d5cdc3]'}`}>{readableAction(m.status)}</span>
+                    </div>
+                    <p className="text-sm font-semibold text-[#4b4742] dark:text-[#e5ddd4] mt-1 truncate">{m.subject}</p>
+                    <p className="text-xs text-[#777067] dark:text-[#b9aea2] mt-1 truncate">{m.message}</p>
+                    <p className="text-[11px] text-[#91867c] dark:text-[#9d9186] mt-2">{m.senderEmail} · {readableDate(m.createdAt)}</p>
+                  </div>
+                  <span className="text-xs font-semibold text-[#9b6847] shrink-0">{expanded ? 'Close' : 'Read message'}</span>
+                </button>
+                {expanded && (
+                  <div className="border-t border-[#e5d8ca] dark:border-[#39332d] p-4 sm:p-5 space-y-4">
+                    <div className="rounded-xl bg-[#f7f1ea] dark:bg-[#211d19] p-4">
+                      <p className="text-[10px] uppercase tracking-wider font-bold text-[#9b6847] mb-2">Original message</p>
+                      <p className="text-sm leading-7 text-[#302a25] dark:text-[#f0e8df] whitespace-pre-wrap">{m.message}</p>
+                    </div>
+                    {replySuccess[m.id] && <p className="text-xs text-emerald-700 dark:text-emerald-400">{replySuccess[m.id]}</p>}
+                    {replyErrors[m.id] && <p role="alert" className="text-xs text-red-700 dark:text-red-400">{replyErrors[m.id]}</p>}
+                    {isReplying ? (
+                      <div className="space-y-3">
+                        <div className="text-xs text-[#68635d] dark:text-[#b9aea2]">To: <strong>{m.senderName}</strong> · {m.senderEmail}</div>
+                        <textarea rows={6} maxLength={5000} value={replyDrafts[m.id] || ''} onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [m.id]: e.target.value }))} placeholder="Write a thoughtful reply…" className="w-full rounded-xl border border-[#c89570] bg-white dark:bg-[#111110] p-4 text-sm text-[#161616] dark:text-[#fffdf9] outline-none focus:ring-2 focus:ring-[#c89570]/30" />
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <span className="text-[11px] text-[#91867c]">{(replyDrafts[m.id] || '').length}/5000 characters · Sent by email</span>
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => setReplyingId(null)} className="px-4 py-2 rounded-full border border-[#ddd4c9] dark:border-[#39332d] text-xs font-semibold">Cancel</button>
+                            <button type="button" disabled={replyBusyId === m.id || (replyDrafts[m.id] || '').trim().length < 2} onClick={() => void sendReply(m)} className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-[#241b15] text-white dark:bg-[#d1a17d] dark:text-[#211811] text-xs font-semibold disabled:opacity-50"><Send className="w-3.5 h-3.5" />{replyBusyId === m.id ? 'Sending…' : 'Send reply'}</button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <span className="text-[11px] text-[#91867c]">Reply will be sent directly to the sender's email address.</span>
+                        <button type="button" onClick={() => { setReplyingId(m.id); setReplyErrors((prev) => ({ ...prev, [m.id]: '' })); }} className="inline-flex items-center gap-2 rounded-full bg-[#241b15] text-white dark:bg-[#d1a17d] dark:text-[#211811] px-5 py-2.5 text-xs font-semibold"><Send className="w-3.5 h-3.5" />Reply to enquiry</button>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between gap-3 border-t border-[#e5d8ca] dark:border-[#39332d] pt-3">
+                      <span className="text-[11px] text-[#91867c]">{m.emailDelivered ? 'Original enquiry was forwarded by email' : 'Original enquiry is stored in your private inbox'}</span>
+                      <select aria-label="Message status" value={m.status} onChange={(e) => void updateContactMessageStatus(m.id, e.target.value as ContactMessage['status'])} className="rounded-lg border border-[#ddd4c9] dark:border-[#39332d] bg-transparent px-2 py-1.5 text-xs">
+                        <option value="unread">Unread</option><option value="read">Read</option><option value="replied">Replied</option><option value="archived">Archived</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </article>
+            );
+          })}
         </div>
       </section>
 
-      {/* Immutable Audit Log */}
       <section className="space-y-4">
-        <h2 className="text-base font-bold text-[#161616] dark:text-[#fffdf9]">
-          Audit History
-        </h2>
-        <div className="bg-[#fffdf9] dark:bg-[#191816] border border-[#ddd4c9] dark:border-[#2c2925] rounded-2xl divide-y divide-[#ddd4c9] dark:divide-[#2c2925]">
-          {auditLogs.slice(0, 20).map((log) => (
-            <div key={log.id} className="px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-xs">
-              <div>
-                <p className="font-semibold text-[#161616] dark:text-[#fffdf9]">{log.summary}</p>
-                <p className="text-[#68635d] dark:text-[#b9aea2]">
-                  {log.action} · {log.entityType}/{log.entityId} · {log.actorEmail}
-                </p>
-              </div>
-              <span className="font-mono-tabular text-[11px] text-[#68635d] dark:text-[#b9aea2]">
-                {log.createdAt ? new Date(log.createdAt).toLocaleString() : ''}
-              </span>
-            </div>
-          ))}
+        <div>
+          <p className="text-[11px] font-semibold tracking-[0.16em] uppercase text-[#b98b6e]">Account activity</p>
+          <h2 className="text-xl font-bold text-[#161616] dark:text-[#fffdf9] mt-1">Audit history</h2>
+          <p className="text-xs text-[#68635d] dark:text-[#b9aea2] mt-1">A plain-language record of changes made in the admin console.</p>
+        </div>
+        <div className="space-y-2">
+          {auditLogs.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-[#cfc3b7] dark:border-[#39332d] p-7 text-center text-xs text-[#68635d] dark:text-[#b9aea2]">No admin activity has been recorded yet.</div>
+          ) : auditLogs.slice(0, 30).map((log) => {
+            let details: Record<string, unknown> = {};
+            try { details = log.detailsJson ? JSON.parse(log.detailsJson) as Record<string, unknown> : {}; } catch { details = {}; }
+            const detailText = Object.entries(details).filter(([key]) => !/token|password|secret/i.test(key)).slice(0, 5).map(([key, value]) => `${readableAction(key)}: ${typeof value === 'string' ? value : JSON.stringify(value)}`);
+            return (
+              <article key={log.id} className="rounded-xl border border-[#ddd4c9] dark:border-[#39332d] bg-[#fffdf9] dark:bg-[#191816] p-4 flex gap-3">
+                <div className="w-9 h-9 shrink-0 rounded-xl bg-[#f1e5d9] dark:bg-[#493021] text-[#8e5e3e] flex items-center justify-center"><Activity className="w-4 h-4" /></div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-sm font-semibold text-[#211b16] dark:text-[#fffdf9]">{log.summary || readableAction(log.action)}</h3>
+                    <span className="text-[10px] rounded-full bg-[#eee8df] dark:bg-[#302a25] px-2 py-1 text-[#75695f]">{readableAction(log.action)}</span>
+                  </div>
+                  <p className="text-xs text-[#68635d] dark:text-[#b9aea2] mt-1">{readableAction(log.entityType)} · Record: {log.entityId}</p>
+                  {detailText.length > 0 && <ul className="mt-2 space-y-1 text-xs text-[#514941] dark:text-[#d5cdc3] list-disc pl-4">{detailText.map((detail, index) => <li key={index}>{detail}</li>)}</ul>}
+                  <p className="text-[11px] text-[#91867c] dark:text-[#9d9186] mt-2">By {log.actorEmail} · {readableDate(log.createdAt)}</p>
+                </div>
+              </article>
+            );
+          })}
         </div>
       </section>
     </div>
