@@ -134,6 +134,41 @@ function persistGitlabSnapshotToCache(snapshot: GitlabSnapshot) {
   }
 }
 
+let gitlabRefreshPromise: Promise<GitlabSnapshot> | null = null;
+let gitlabRateLimitedUntilMs = 0;
+
+async function refreshGitlabSnapshot(forceRefresh = false): Promise<GitlabSnapshot> {
+  const cacheTtlMs = 30 * 60 * 1000;
+  const cacheIsFresh = Boolean(cachedGitlabSnapshot && Date.now() - cachedGitlabAtMs < cacheTtlMs);
+
+  if (!forceRefresh && cacheIsFresh && cachedGitlabSnapshot) return cachedGitlabSnapshot;
+  if (Date.now() < gitlabRateLimitedUntilMs && cachedGitlabSnapshot) return cachedGitlabSnapshot;
+
+  if (!gitlabRefreshPromise) {
+    gitlabRefreshPromise = fetchGitLabSnapshot(GITLAB_USERNAME)
+      .then((fresh) => {
+        const merged = mergeGitlabSnapshot(cachedGitlabSnapshot, fresh);
+        persistGitlabSnapshotToCache(merged);
+        gitlabRateLimitedUntilMs = 0;
+        return merged;
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        if (/rate limit|429/i.test(message)) {
+          // Honor a conservative cooldown so repeated page visits do not amplify 429s.
+          gitlabRateLimitedUntilMs = Date.now() + 15 * 60 * 1000;
+        }
+        if (cachedGitlabSnapshot) return cachedGitlabSnapshot;
+        throw error;
+      })
+      .finally(() => {
+        gitlabRefreshPromise = null;
+      });
+  }
+
+  return gitlabRefreshPromise;
+}
+
 function mergeGithubSnapshot(
   prev: GithubSnapshot | null,
   fresh: GithubSnapshot
@@ -406,29 +441,14 @@ async function startServer() {
     }
   });
 
-  // Public GitLab Snapshot (caches for 30 minutes unless ?refresh=1)
+  // Public GitLab Snapshot (30-minute cache, single-flight refresh, and stale-cache fallback)
   app.get('/api/gitlab/snapshot', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     const forceRefresh = req.query.refresh === '1';
     try {
-      const cacheTtlMs = 30 * 60 * 1000;
-      const missingRichData = !cachedGitlabSnapshot?.avatarUrl && !cachedGitlabSnapshot?.lastActivityAtomAt;
-      if (
-        forceRefresh ||
-        !cachedGitlabSnapshot ||
-        missingRichData ||
-        Date.now() - cachedGitlabAtMs > cacheTtlMs
-      ) {
-        const fresh = await fetchGitLabSnapshot(GITLAB_USERNAME);
-        const merged = mergeGitlabSnapshot(cachedGitlabSnapshot, fresh);
-        persistGitlabSnapshotToCache(merged);
-      }
-      res.json(cachedGitlabSnapshot);
+      const snapshot = await refreshGitlabSnapshot(forceRefresh);
+      res.json(snapshot);
     } catch (err) {
-      if (!forceRefresh && cachedGitlabSnapshot) {
-        res.json(cachedGitlabSnapshot);
-        return;
-      }
       res.status(502).json({
         error: err instanceof Error ? err.message : 'Unable to fetch GitLab profile.',
       });
@@ -459,11 +479,9 @@ async function startServer() {
 
       let gitlabSnapshot: GitlabSnapshot | null = cachedGitlabSnapshot;
       try {
-        const freshGitlab = await fetchGitLabSnapshot(GITLAB_USERNAME);
-        gitlabSnapshot = mergeGitlabSnapshot(cachedGitlabSnapshot, freshGitlab);
-        persistGitlabSnapshotToCache(gitlabSnapshot);
+        gitlabSnapshot = await refreshGitlabSnapshot(false);
       } catch {
-        // Keep existing cached GitLab snapshot if GitLab upstream rate-limits
+        // GitLab is optional for a successful GitHub sync; preserve any cached snapshot.
       }
 
       const projectByRepo = new Map<string, Project>();
