@@ -15,6 +15,7 @@ import {
   Send,
   Activity,
 } from 'lucide-react';
+import { auth } from '../lib/firebase';
 import type {
   AnalyticsEvent,
   AuditLog,
@@ -68,6 +69,43 @@ const PROFICIENCY_LEVELS: SkillProficiency[] = [
   'Currently Learning',
 ];
 
+
+function ApprovalContentPreview({ json, emptyLabel }: { json: string; emptyLabel: string }) {
+  let data: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(json || '{}') as unknown;
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) data = parsed as Record<string, unknown>;
+    else data = { content: parsed };
+  } catch {
+    return <pre className="text-xs whitespace-pre-wrap break-words text-[#514941] dark:text-[#d5cdc3]">{json}</pre>;
+  }
+  const entries = Object.entries(data).filter(([key]) => !['id', 'createdAt', 'updatedAt'].includes(key));
+  if (!entries.length) return <p className="text-xs text-[#8a8178] dark:text-[#b9aea2]">{emptyLabel}</p>;
+  const humanize = (key: string) => key.replace(/([A-Z])/g, ' $1').replace(/[_-]+/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
+  const display = (value: unknown) => {
+    if (value === null || value === undefined || value === '') return 'Not provided';
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+    if (Array.isArray(value)) return value.length ? value.join(' · ') : 'None';
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+  };
+  return (
+    <div className="grid sm:grid-cols-2 gap-2">
+      {entries.slice(0, 12).map(([key, value]) => (
+        <div key={key} className="rounded-xl bg-white/70 dark:bg-[#111110]/70 border border-[#e7ddd2] dark:border-[#39332d] px-3 py-2.5">
+          <p className="text-[10px] uppercase tracking-wide font-semibold text-[#9b806b]">{humanize(key)}</p>
+          <p className="text-xs leading-relaxed text-[#302a25] dark:text-[#f0e8df] mt-1 break-words">{display(value)}</p>
+        </div>
+      ))}
+      {entries.length > 12 && <p className="sm:col-span-2 text-[11px] text-[#8a8178]">And {entries.length - 12} more fields.</p>}
+      <details className="sm:col-span-2">
+        <summary className="cursor-pointer text-[11px] font-semibold text-[#9b6847]">View raw details</summary>
+        <pre className="mt-2 text-[11px] font-mono-tabular bg-[#f7f3ed] dark:bg-[#111110] border border-[#ddd4c9] dark:border-[#2c2925] rounded-xl p-3 overflow-x-auto max-h-56">{JSON.stringify(data, null, 2)}</pre>
+      </details>
+    </div>
+  );
+}
+
 export function ApprovalsPanel({ approvals }: { approvals: PendingApproval[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editedJson, setEditedJson] = useState('');
@@ -113,7 +151,7 @@ export function ApprovalsPanel({ approvals }: { approvals: PendingApproval[] }) 
           Pending Approvals ({pending.length})
         </h2>
         <p className="text-xs text-[#68635d] dark:text-[#b9aea2] mt-1">
-          No GitHub detection or AI draft becomes public until you explicitly approve it.
+          Nothing is published automatically. Review the suggested change, then approve, edit, or decline it.
         </p>
       </div>
 
@@ -136,19 +174,19 @@ export function ApprovalsPanel({ approvals }: { approvals: PendingApproval[] }) 
             return (
               <div
                 key={item.id}
-                className="bg-[#fffdf9] dark:bg-[#191816] border border-[#ddd4c9] dark:border-[#2c2925] rounded-2xl p-6 space-y-4"
+                className="relative overflow-hidden bg-gradient-to-br from-[#fffdf9] via-[#fffdf9] to-[#f4e7dc] dark:from-[#191816] dark:via-[#191816] dark:to-[#30231b] border border-[#cfa385] dark:border-[#76543e] rounded-2xl p-6 space-y-5 shadow-[0_12px_35px_rgba(128,83,48,0.08)]"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-xs text-[#b98b6e] font-semibold tracking-wide uppercase">
-                      {item.source} · {item.category} · {item.targetType}
+                      {item.source === 'gemini_ai' ? 'AI suggestion' : item.source === 'github_sync' ? 'GitHub update' : 'Manual draft'} · {item.category.replace(/[_-]+/g, ' ')} · {item.targetType}
                     </p>
                     <h3 className="text-base font-bold text-[#161616] dark:text-[#fffdf9] mt-0.5">
                       {item.title}
                     </h3>
                   </div>
                   <span className="text-xs font-mono-tabular text-[#b98b6e] font-semibold">
-                    Pending Review
+                    Needs your review
                   </span>
                 </div>
 
@@ -159,15 +197,15 @@ export function ApprovalsPanel({ approvals }: { approvals: PendingApproval[] }) 
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <p className="text-xs font-semibold text-[#68635d] dark:text-[#b9aea2]">
-                      Previous Content
+                      What is there now
                     </p>
                     <pre className="text-[11px] font-mono-tabular bg-[#f7f3ed] dark:bg-[#111110] border border-[#ddd4c9] dark:border-[#2c2925] rounded-xl p-3.5 overflow-x-auto max-h-56 text-[#161616] dark:text-[#f7f3ed]">
-                      {item.previousContentJson || '{}'}
+                      {item.previousContentJson || 'No previous version — this is a new item.'}
                     </pre>
                   </div>
                   <div className="space-y-1.5">
                     <p className="text-xs font-semibold text-[#68635d] dark:text-[#b9aea2]">
-                      Proposed Content
+                      What will change
                     </p>
                     {isEditing ? (
                       <textarea
@@ -227,7 +265,7 @@ export function ApprovalsPanel({ approvals }: { approvals: PendingApproval[] }) 
                           className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-full border border-[#ddd4c9] dark:border-[#2c2925] text-[#161616] dark:text-[#fffdf9] hover:bg-[#f4f0e9] dark:hover:bg-[#24211e]"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
-                          <span>Edit Before Approval</span>
+                          <span>Review & Edit</span>
                         </button>
                         <button
                           type="button"
@@ -1208,7 +1246,7 @@ export function InboxAnalyticsAuditPanel({
     setReplyErrors((prev) => ({ ...prev, [message.id]: '' }));
     setReplySuccess((prev) => ({ ...prev, [message.id]: '' }));
     try {
-      const currentUser = (await import('../lib/firebase')).auth.currentUser;
+      const currentUser = auth.currentUser;
       if (!currentUser) throw new Error('Your admin session has expired. Please sign in again.');
       const token = await currentUser.getIdToken();
       const response = await fetch('/api/admin/contact-reply', {
