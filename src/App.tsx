@@ -98,7 +98,6 @@ export default function App() {
 
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState<boolean>(false);
-  const [adminMfaVerified, setAdminMfaVerified] = useState(false);
 
   const [profile, setProfile] = useState<PortfolioProfile>(DEFAULT_PROFILE);
   const [projects, setProjects] = useState<Project[]>(DEFAULT_PROJECTS);
@@ -127,27 +126,8 @@ export default function App() {
   const isAdmin = Boolean(
     user &&
       user.emailVerified &&
-      user.email?.toLowerCase() === ADMIN_EMAIL &&
-      adminMfaVerified
+      user.email?.toLowerCase() === ADMIN_EMAIL
   );
-
-  useEffect(() => {
-    let cancelled = false;
-    setAdminMfaVerified(false);
-    if (user && user.emailVerified && user.email?.toLowerCase() === ADMIN_EMAIL) {
-      void user.getIdTokenResult().then(({ claims }) => {
-        const firebaseClaims = claims.firebase as { sign_in_second_factor?: string } | undefined;
-        if (!cancelled) {
-          setAdminMfaVerified(firebaseClaims?.sign_in_second_factor === 'totp');
-        }
-      }).catch(() => {
-        if (!cancelled) setAdminMfaVerified(false);
-      });
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
 
   // Theme synchronization
   useEffect(() => {
