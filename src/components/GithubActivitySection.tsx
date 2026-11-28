@@ -97,18 +97,7 @@ export function GithubActivitySection({
             <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#161616] dark:text-[#fffdf9] text-balance">
               Live GitHub Profile, Contributions & Repositories
             </h1>
-            <p className="text-sm sm:text-base text-[#68635d] dark:text-[#b9aea2]">
-              Synchronized directly from{' '}
-              <a
-                href="https://github.com/Lex-Cable"
-                target="_blank"
-                rel="noreferrer"
-                className="font-semibold text-[#b98b6e] hover:underline"
-              >
-                github.com/Lex-Cable
-              </a>
-              , including profile README, contribution graph, pinned projects, achievements, and starred repositories.
-            </p>
+        </p>
           </div>
           <div className="flex flex-wrap items-center gap-3 shrink-0">
             {refreshedNotice && (
