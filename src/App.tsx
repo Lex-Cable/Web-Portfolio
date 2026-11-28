@@ -1,5 +1,5 @@
-import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
-import { onAuthStateChanged, type User } from 'firebase/auth';
+import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
 import { Download, FileText, X } from 'lucide-react';
 import { ADMIN_EMAIL, auth, testFirestoreConnection } from './lib/firebase';
 import {
@@ -156,6 +156,16 @@ export default function App() {
     setCurrentPath(path);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
+
+  // Leaving the admin route ends the Firebase session; returning requires a fresh Google sign-in.
+  const previousPathRef = useRef(currentPath);
+  useEffect(() => {
+    const wasAdminRoute = previousPathRef.current === '/admin';
+    previousPathRef.current = currentPath;
+    if (wasAdminRoute && currentPath !== '/admin' && auth.currentUser) {
+      void signOut(auth);
+    }
+  }, [currentPath]);
 
   // SEO document title synchronization
   useEffect(() => {
